@@ -3,7 +3,7 @@ from base64 import b64encode
 from io import BytesIO
 
 from click import File, argument, command, option, pass_obj
-import PIL.Image as Image
+from PIL import Image
 
 
 @command(help="Obtain an image description.")
@@ -66,8 +66,15 @@ async def adescribe(
 
 
 def image_url(file):
-    img = Image.open(file)
-    w, h = img.size
+    return dict(type="image_url",
+        image_url=dict(url=data_url(clip(Image.open(file), 2000, 768)),
+            detail="high"
+        )
+    )
+
+
+def clip(image, long, short):
+    w, h = image.size
 
     def shrink(f, n):
         nonlocal w, h
@@ -77,14 +84,11 @@ def image_url(file):
             h = h * factor
             w = w * factor
 
-    shrink(max, 2000)
-    shrink(min, 768)
+    shrink(max, long)
+    shrink(min, short)
 
-    if (w, h) != img.size:
-        img = img.resize((round(w), round(h)))
-
-    return dict(
-        type="image_url", image_url=dict(url=data_url(img), detail="high")
+    return (
+        image.resize((round(w), round(h))) if (w, h) != image.size else image
     )
 
 

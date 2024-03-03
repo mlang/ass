@@ -1,8 +1,8 @@
 from asyncio import Future, Semaphore
 from typing import Any, Generator, Generic, TypeVar
 from prompt_toolkit.application.current import get_app
-from prompt_toolkit.layout.containers import Float, FloatContainer
-from prompt_toolkit.widgets import Button, Dialog, TextArea
+from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
+from prompt_toolkit.widgets import Button, Dialog, Label, TextArea
 
 T = TypeVar('T')
 class ModalDialog(Dialog, Generic[T]):
@@ -16,19 +16,42 @@ class ModalDialog(Dialog, Generic[T]):
 
 
 class ConfirmDialog(ModalDialog):
-    def __init__(self, title="", text=""):
+    def __init__(self, title="", text="", yes="Yes", no="No"):
         def accept_text(buffer):
             get_app().layout.focus(buttons[0])
             buffer.complete_state = None
             return True
-        text_area = TextArea(text=text, multiline=True, read_only=True,
+        textarea = TextArea(text=text, multiline=True, read_only=True,
             accept_handler=accept_text
         )
         buttons = [
-            Button(text="Allow", handler=lambda: self.finish(True)),
-            Button(text="Deny", handler=lambda: self.finish(False))
+            Button(text=yes, handler=lambda: self.finish(True)),
+            Button(text=no, handler=lambda: self.finish(False))
         ]
-        super().__init__(title=title, body=text_area, buttons=buttons)
+        super().__init__(title=title, body=textarea, buttons=buttons)
+
+
+class TextInputDialog(ModalDialog):
+    def __init__(self, title="", text="", completer=None,
+                 ok="OK", cancel="Cancel"
+    ):
+        def accept_text(buffer):
+            get_app().layout.focus(buttons[0])
+            buffer.complete_state = None
+            return True
+        self.textarea = TextArea(
+            multiline=False,
+            accept_handler=accept_text
+        )
+        buttons = [
+            Button(text=ok, handler=lambda: self.finish(self.textarea.text)),
+            Button(text=cancel, handler=lambda: self.finish(None))
+        ]
+        super().__init__(
+            title=title,
+            body=HSplit([Label(text=text), self.textarea]),
+            buttons=buttons
+        )
 
 
 there_can_be_only_one = Semaphore(1)

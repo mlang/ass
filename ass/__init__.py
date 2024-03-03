@@ -12,6 +12,7 @@ from ass.owm import AsyncOpenWeatherMap
 from ass.snd import play
 
 from ass.tools import load_tools
+import ass.tools.dialogs
 import ass.tools.orf
 import ass.tools.owm
 import ass.tools.shell
