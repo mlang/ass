@@ -1,16 +1,19 @@
 from asyncio import create_task, gather, run, sleep
+from dataclasses import dataclass, field
 from functools import partial
 import re
+from typing import Optional
 from click import command, option, argument, pass_obj, File
 from openai import AsyncOpenAI
+from openai.resources.beta.threads.runs import AsyncRuns
 from prompt_toolkit.application import Application
 from prompt_toolkit.application.current import get_app
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import PathCompleter, WordCompleter
 from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.focus import focus_next
 from prompt_toolkit.layout.containers import (
-    Float, FloatContainer, HSplit, Window
+    Float, FloatContainer, FormattedTextControl, HSplit, VSplit, Window, WindowAlign
 )
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.lexers import PygmentsLexer
@@ -21,7 +24,7 @@ from prompt_toolkit.widgets import (
 from pygments.lexers.markup import MarkdownLexer
 
 from ass.oai import new_assistant, new_thread, new_files, Usage
-from ass.ptutils import show_dialog
+from ass.ptutils import show_dialog, ConfirmDialog, MultipleChoiceDialog, TextInputDialog
 from ass.tools import tools_options, tools, tool_call
 
 @command(help="Interactively chat with an assistant")
@@ -52,7 +55,7 @@ async def tui(client, spec, files):
                 await app(client, thread, assistant)
 
 async def app(client, thread, assistant):
-    usage = Usage()
+    state = State()
     search_field = SearchToolbar()
 
     output_field = TextArea(
@@ -76,8 +79,23 @@ async def app(client, thread, assistant):
     )
 
     def status_text():
-        return f"{usage.prompt_tokens}|{usage.completion_tokens}" + ("-" * 100)
-    statusbar = FormattedTextToolbar(text=status_text, style="class:line")
+        return [
+            ('', '---'),
+            ('class:run', f"[{state.run.status if state.run else ''}]"),
+            ('', '---')
+        ]
+    def status_text_right():
+        return [
+            ('', '---'),
+            ('class:tokens', f"{state.usage.prompt_tokens}|{state.usage.completion_tokens}"),
+            ('', "---"),
+        ]
+    statusbar = VSplit([
+        Window(FormattedTextControl(status_text), char='-'),
+        Window(FormattedTextControl(status_text_right), char='-',
+            align=WindowAlign.RIGHT
+        )
+    ], height=1)
 
     container = FloatContainer(
         content=HSplit([
@@ -98,7 +116,7 @@ async def app(client, thread, assistant):
             def display(text):
                 add_text(output_field, f"\n{text}")
             create_task(
-                txrx(client.openai, thread, buffer.text, assistant, display, usage, exec_tool_call)
+                txrx(client.openai, thread, buffer.text, assistant, display, state, exec_tool_call)
             )
 
     input_field.accept_handler = accept
@@ -123,28 +141,32 @@ async def app(client, thread, assistant):
     ).run_async()
 
 
-async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, usage, exec_tool_call):
+async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, exec_tool_call):
     message = await openai.beta.threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
     display(text)
-    run = await openai.beta.threads.runs.create(
+    state.run = await openai.beta.threads.runs.create(
         thread_id=thread.id, assistant_id=assistant.id
     )
-    while run.status in ('queued', 'in_progress'):
+    get_app().invalidate()
+    while state.run.status in ('queued', 'in_progress'):
         await sleep(1)
-        run = await openai.beta.threads.runs.retrieve(
-            run_id=run.id, thread_id=thread.id
+        state.run = await openai.beta.threads.runs.retrieve(
+            run_id=state.run.id, thread_id=thread.id
         )
-        if run.status == 'requires_action' and run.required_action is not None:
-            run = await openai.beta.threads.runs.submit_tool_outputs(
-                thread_id=thread.id, run_id=run.id,
+        get_app().invalidate()
+        if state.run.status == 'requires_action' and state.run.required_action is not None:
+            state.run = await openai.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread.id, run_id=state.run.id,
                 tool_outputs=await gather(*map(
                     exec_tool_call,
-                    run.required_action.submit_tool_outputs.tool_calls
+                    state.run.required_action.submit_tool_outputs.tool_calls
                 ))
             )
-    usage += run.usage
+            get_app().invalidate()
+
+    state.usage += state.run.usage
     
     messages = await openai.beta.threads.messages.list(
         thread_id=thread.id, before=message.id
@@ -160,3 +182,9 @@ def add_text(text_area: TextArea, text: str) -> None:
         text=text_area.text + text,
         cursor_position=text_area.document.cursor_position
     )
+
+
+@dataclass
+class State:
+    usage: Usage = field(default_factory=Usage)
+    run: Optional[AsyncRuns] = None

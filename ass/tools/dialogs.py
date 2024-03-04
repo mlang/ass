@@ -1,42 +1,61 @@
-from typing import List
+from collections import namedtuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type
+
 from pydantic import BaseModel, Field
 
-from ass.ptutils import ConfirmDialog, TextInputDialog
+from ass.ptutils import ConfirmDialog, ModalDialog, MultipleChoiceDialog, TextInputDialog
 from ass.tools import function
 
 class Confirm(BaseModel):
-    title: str
-    text: str
-    yes: str = "Yes"
-    no: str = "No"
+    """A message dialog which asks the user to either confirm or deny.  Return type is a boolean value.  Use this for "Yes/No" questions."""
+    type: Literal['ConfirmDialog']
+    title: str = Field(description="The title of the dialog box.")
+    text: str = Field(
+        description="The message text to display in the dialog box."
+    )
+    yes_label: str = Field("Yes",
+        description="The label of the confirmation button."
+    )
+    no_label: str = Field("No",
+        description="The label of the button which cancels the dialog."
+    )
 
 class TextInput(BaseModel):
+    """A dialog which allows the user to enter a string.  Return type is either a string or null, which indicates the user cancelled the dialog."""
+    type: Literal['TextInputDialog']
     title: str
     text: str
-    ok: str = "OK"
-    cancel: str = "Cancel"
+    ok_label: str = "OK"
+    cancel_label: str = "Cancel"
+
+class MultipleChoice(BaseModel):
+    """A multiselect list dialog.  Use this when querying the user for several selections.  Return type is a list of all selected items."""
+    type: Literal['MultipleChoiceDialog']
+    title: str = Field(description="The title of the dialog box.")
+    text: str = Field(description="Text displayed above of the checkbox list.")
+    values: List[str] = Field(
+        min_length=2,
+        max_length=32,
+        description="The checkbox items."
+    )
+    ok_label: str = "OK"
+    cancel_label: str = "Cancel"
 
 
 @function(
-    "Ask the user a series of questions.",
+    "Execute a sequence of dialogs.  Choose amongst the available dialog box types approriately.",
     "Allow prompting."
 )
 class dialogs(BaseModel):
-    questions: List[Confirm | TextInput] = Field(
+    questions: List[Confirm | TextInput | MultipleChoice] = Field(
         description="List of dialogs to pop up in sequence.",
-        min_length=1
+        min_length=1, max_length=99
     )
 
     async def __call__(self, show_dialog, client):
-        dialog = {
-            Confirm: ConfirmDialog,
-            TextInput: TextInputDialog
-        }
         results = []
         for question in self.questions:
-            results.append(
-                await show_dialog(
-                    dialog[type(question)](**question.model_dump())
-                )
-            )
+            args = question.model_dump()
+            dialog = globals()[args.pop('type')]
+            results.append(await show_dialog(dialog(**args)))
         return results

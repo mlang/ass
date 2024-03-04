@@ -2,7 +2,7 @@ from asyncio import Future, Semaphore
 from typing import Any, Generator, Generic, TypeVar
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
-from prompt_toolkit.widgets import Button, Dialog, Label, TextArea
+from prompt_toolkit.widgets import Button, CheckboxList, Dialog, Label, TextArea
 
 T = TypeVar('T')
 class ModalDialog(Dialog, Generic[T]):
@@ -16,7 +16,7 @@ class ModalDialog(Dialog, Generic[T]):
 
 
 class ConfirmDialog(ModalDialog):
-    def __init__(self, title="", text="", yes="Yes", no="No"):
+    def __init__(self, title="", text="", yes_label="Yes", no_label="No"):
         def accept_text(buffer):
             get_app().layout.focus(buttons[0])
             buffer.complete_state = None
@@ -25,15 +25,15 @@ class ConfirmDialog(ModalDialog):
             accept_handler=accept_text
         )
         buttons = [
-            Button(text=yes, handler=lambda: self.finish(True)),
-            Button(text=no, handler=lambda: self.finish(False))
+            Button(text=yes_label, handler=lambda: self.finish(True)),
+            Button(text=no_label, handler=lambda: self.finish(False))
         ]
         super().__init__(title=title, body=textarea, buttons=buttons)
 
 
 class TextInputDialog(ModalDialog):
     def __init__(self, title="", text="", completer=None,
-                 ok="OK", cancel="Cancel"
+                 ok_label="OK", cancel_label="Cancel"
     ):
         def accept_text(buffer):
             get_app().layout.focus(buttons[0])
@@ -44,12 +44,30 @@ class TextInputDialog(ModalDialog):
             accept_handler=accept_text
         )
         buttons = [
-            Button(text=ok, handler=lambda: self.finish(self.textarea.text)),
-            Button(text=cancel, handler=lambda: self.finish(None))
+            Button(text=ok_label, handler=lambda: self.finish(self.textarea.text)),
+            Button(text=cancel_label, handler=lambda: self.finish(None))
         ]
         super().__init__(
             title=title,
             body=HSplit([Label(text=text), self.textarea]),
+            buttons=buttons
+        )
+
+
+class MultipleChoiceDialog(ModalDialog):
+    def __init__(self, title="", text="", values=[],
+                 ok_label="OK", cancel_label="Cancel"
+    ):
+        self.checkboxlist = CheckboxList(
+            values=[(value, value) for value in values]
+        )
+        buttons = [
+            Button(text=ok_label, handler=lambda: self.finish(self.checkboxlist.current_values)),
+            Button(text=cancel_label, handler=lambda: self.finish(None))
+        ]
+        super().__init__(
+            title=title,
+            body=HSplit([Label(text=text), self.checkboxlist]),
             buttons=buttons
         )
 
