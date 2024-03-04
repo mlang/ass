@@ -1,9 +1,8 @@
-from collections import namedtuple
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from ass.ptutils import ConfirmDialog, ModalDialog, MultipleChoiceDialog, TextInputDialog
+from ass.ptutils import ConfirmDialog, MultipleChoiceDialog, TextInputDialog
 from ass.tools import function
 
 class Confirm(BaseModel):
