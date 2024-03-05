@@ -2,10 +2,10 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from ass.ptutils import ConfirmDialog, MultipleChoiceDialog, TextInputDialog
+import ass.ptutils as ptdialogs
 from ass.tools import function
 
-class Confirm(BaseModel):
+class ConfirmDialog(BaseModel):
     """A message dialog which asks the user to either confirm or deny.  Return type is a boolean value.  Use this for "Yes/No" questions."""
     type: Literal['ConfirmDialog']
     title: str = Field(description="The title of the dialog box.")
@@ -19,7 +19,7 @@ class Confirm(BaseModel):
         description="The label of the button which cancels the dialog."
     )
 
-class TextInput(BaseModel):
+class TextInputDialog(BaseModel):
     """A dialog which allows the user to enter a string.  Return type is either a string or null, which indicates the user cancelled the dialog."""
     type: Literal['TextInputDialog']
     title: str
@@ -27,9 +27,24 @@ class TextInput(BaseModel):
     ok_label: str = "OK"
     cancel_label: str = "Cancel"
 
-class MultipleChoice(BaseModel):
-    """A multiselect list dialog.  Use this when querying the user for several selections.  Return type is a list of all selected items."""
-    type: Literal['MultipleChoiceDialog']
+
+class RadioListDialog(BaseModel):
+    """A single select list dialog.  Use this when querying the user for a single choice from a list of items.  Return the selected item, or null when the user cancelled the dialog."""
+    type: Literal['RadioListDialog']
+    title: str = Field(description="The title of the dialog box.")
+    text: str = Field(description="Text displayed above of the radio button list.")
+    values: List[str] = Field(
+        min_length=2,
+        max_length=32,
+        description="The list items."
+    )
+    ok_label: str = "OK"
+    cancel_label: str = "Cancel"
+
+
+class CheckboxListDialog(BaseModel):
+    """A multiselect list dialog.  Use this when querying the user for several selections.  Return type is a list of all selected items, or null when the user cancelled the dialog."""
+    type: Literal['CheckboxListDialog']
     title: str = Field(description="The title of the dialog box.")
     text: str = Field(description="Text displayed above of the checkbox list.")
     values: List[str] = Field(
@@ -46,15 +61,16 @@ class MultipleChoice(BaseModel):
     "Allow prompting."
 )
 class dialogs(BaseModel):
-    questions: List[Confirm | TextInput | MultipleChoice] = Field(
-        description="List of dialogs to pop up in sequence.",
-        min_length=1, max_length=99
+    questions: List[ConfirmDialog | RadioListDialog | CheckboxListDialog | TextInputDialog] = Field(
+        description="List of modal dialogs to pop up in sequence.  Returns a list of results.",
+        min_length=1, max_length=99,
+        discriminator='type'
     )
 
     async def __call__(self, show_dialog, client):
         results = []
         for question in self.questions:
             args = question.model_dump()
-            dialog = globals()[args.pop('type')]
+            dialog = getattr(ptdialogs, args.pop('type'))
             results.append(await show_dialog(dialog(**args)))
         return results

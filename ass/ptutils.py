@@ -2,7 +2,9 @@ from asyncio import Future, Semaphore
 from typing import Any, Generator, Generic, TypeVar
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
-from prompt_toolkit.widgets import Button, CheckboxList, Dialog, Label, TextArea
+from prompt_toolkit.widgets import (
+    Button, CheckboxList, Dialog, Label, RadioList, TextArea
+)
 
 T = TypeVar('T')
 class ModalDialog(Dialog, Generic[T]):
@@ -54,7 +56,24 @@ class TextInputDialog(ModalDialog):
         )
 
 
-class MultipleChoiceDialog(ModalDialog):
+class RadioListDialog(ModalDialog):
+    def __init__(self, title="", text="", values=[],
+                 ok_label="OK", cancel_label="Cancel"
+    ):
+        self.radiolist = RadioList(
+            values=[(value, value) for value in values]
+        )
+        buttons = [
+            Button(text=ok_label, handler=lambda: self.finish(self.radiolist.current_value)),
+            Button(text=cancel_label, handler=lambda: self.finish(None))
+        ]
+        super().__init__(
+            title=title,
+            body=HSplit([Label(text=text), self.radiolist]),
+            buttons=buttons
+        )
+
+class CheckboxListDialog(ModalDialog):
     def __init__(self, title="", text="", values=[],
                  ok_label="OK", cancel_label="Cancel"
     ):

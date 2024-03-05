@@ -24,7 +24,7 @@ from prompt_toolkit.widgets import (
 from pygments.lexers.markup import MarkdownLexer
 
 from ass.oai import new_assistant, new_thread, new_files, Usage
-from ass.ptutils import show_dialog, ConfirmDialog, MultipleChoiceDialog, TextInputDialog
+from ass.ptutils import show_dialog, ConfirmDialog, CheckboxListDialog, TextInputDialog
 from ass.tools import tools_options, tools, tool_call
 
 @command(help="Interactively chat with an assistant")
