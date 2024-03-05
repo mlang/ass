@@ -3,10 +3,10 @@ from pydantic import BaseModel, Field
 from ass.tools import function
 
 
-@function("Retrieve current weather for a particular location",
-    "Give the model access to OpenWeatherMap."
-)
+@function("Give the model access to OpenWeatherMap.")
 class weather(BaseModel):
+    """Retrieve current weather for a particular location."""
+
     location: str = Field(
         description="""Will be looked up using a geocoder."""
     )

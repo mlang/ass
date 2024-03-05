@@ -25,7 +25,8 @@ IconName = Literal[*sorted(icons.keys())] # type: ignore
 class SoundIcon(BaseModel):
     name: IconName # type: ignore
 
-@function(
+@function("Let the model use Text-To-Speech and SoundIcons.")
+class tts(BaseModel):
     """Render synthetic speech and/or sound icons.
     Use it when answering the user with plain text.
     Use SoundIcons if appropriate, for instance, to indicate list items or
@@ -33,10 +34,8 @@ class SoundIcon(BaseModel):
     code and/or other data. Never call this function more then once
     per tool call, since that would result in several clips being played at
     once. Audio output has been tested and is working properly.
-    """,
-    "Let the model use Text-To-Speech and SoundIcons."
-)
-class tts(BaseModel):
+    """
+
     clips: List[Text | SoundIcon] = Field(min_length=1)
 
     async def __call__(self, show_dialog, client):

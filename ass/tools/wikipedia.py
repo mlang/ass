@@ -1,16 +1,15 @@
 from typing import Literal
+from xml.etree import ElementTree
 
 from pydantic import BaseModel
-from xml.etree import ElementTree
 
 from ass.tools import function
 
 
-@function(
-    """Fetch a wikipedia article by page name.""",
-    "Allow access to wikipedia."
-)
+@function("Allow access to wikipedia.")
 class wikipedia(BaseModel):
+    """Fetch a wikipedia article by page name."""
+
     lang: Literal['de', 'en', 'es', 'fr', 'it', 'nl', 'no', 'pt', 'ro'] = 'en'
     page: str
 

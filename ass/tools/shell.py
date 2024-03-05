@@ -7,11 +7,10 @@ from ass.ptutils import ConfirmDialog
 from ass.tools import function
 
 
-@function(
-    """Execute a shell command (bash).""",
-    "Give the model (supervised) access to the local Shell."
-)
+@function("Give the model (supervised) access to the local Shell.")
 class shell(BaseModel):
+    """Execute a shell command (bash)."""
+
     command: str
 
     async def __call__(self, show_dialog, client):

@@ -41,7 +41,7 @@ def tools_options(command):
 
 models = {}
 
-def function(description, option_help):
+def function(option_help):
     def decorator(model):
         global models, options, tools
         models[model.__name__] = model
@@ -49,12 +49,14 @@ def function(description, option_help):
         options.append(
             option(option_name, is_flag=True, default=False, help=option_help)
         )
+        parameters = model.model_json_schema()
+        description = parameters.pop('description')
         tools[model.__name__] = dict(
             type='function',
             function=dict(
                 name=model.__name__,
                 description=description,
-                parameters=model.model_json_schema()
+                parameters=parameters
             )
         )
         return model

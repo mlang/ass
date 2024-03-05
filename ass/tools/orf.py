@@ -9,8 +9,10 @@ import httpx
 from ass.tools import function
 from pydantic import BaseModel
 
-@function("Fetch local news from ORF", "Enable fetching news from ORF.")
+@function("Enable fetching news from ORF.")
 class orf_news(BaseModel):
+    """Fetch local news from ORF."""
+
     async def __call__(self, show_dialog, client):
         return await news(client.http)
 

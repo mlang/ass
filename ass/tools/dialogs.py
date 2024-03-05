@@ -68,11 +68,12 @@ class CheckboxListDialog(BaseModel):
     cancel_label: str = "Cancel"
 
 
-@function(
-    "Execute a sequence of dialogs.  Choose amongst the available dialog box types approriately.",
-    "Allow the model to pop up dialog boxes."
-)
+@function("Allow the model to pop up dialog boxes.")
 class dialogs(BaseModel):
+    """Execute a sequence of dialogs.
+    Choose amongst the available dialog box types approriately.
+    """
+
     questions: List[ ConfirmDialog
                    | RadioListDialog
                    | CheckboxListDialog
