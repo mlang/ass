@@ -33,7 +33,7 @@ def cli(ctx, **kwargs):
 cli.add_command(tui.chat)
 cli.add_command(vision.describe_image)
 
-@cli.command(help="Text-To-Speech")
+@cli.command(help="Convert Tex to Speech")
 @option("--model", default="tts-1-hd")
 @option("--voice", default="nova")
 @option("--speed", default=1.2)
@@ -53,15 +53,6 @@ async def atts(openai: AsyncOpenAI, model, voice, speed, format, input):
     else:
         await play([bytes])
 
-
-@cli.command()
-@argument("location")
-@pass_obj
-def owm(client, location):
-    print(run(aowm(client, location)))
-
-async def aowm(client, location):
-    return await client.owm.weather(await client.geocoder.geocode(location))
 
 class clients:
     def __init__(self, *, openai_api_key, openweathermap_api_key):

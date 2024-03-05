@@ -9,6 +9,7 @@ class ConfirmDialog(BaseModel):
     """A message dialog which asks the user to either confirm or deny.
     Return type is a boolean value.  Use this for "Yes/No" questions.
     """
+
     type: Literal['ConfirmDialog']
     title: str = Field(description="The title of the dialog box.")
     text: str = Field(
@@ -26,6 +27,7 @@ class TextInputDialog(BaseModel):
     Return type is either a string or null, which indicates the user cancelled
     the dialog.
     """
+
     type: Literal['TextInputDialog']
     title: str
     text: str

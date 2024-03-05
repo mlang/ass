@@ -4,6 +4,8 @@ from os import path, walk
 
 from click import option
 
+__all__ = ['function', 'load_tools', 'tools_options', 'tools', 'tool_call']
+
 
 def load_tools():
     for spec in (
@@ -16,8 +18,6 @@ def load_tools():
     ):
         spec.loader.exec_module(module_from_spec(spec))
 
-
-__all__ = ['function', 'load_tools', 'tools_options', 'tools', 'tool_call']
 
 tools = dict(
     code_interpreter={'type': 'code_interpreter'},
@@ -41,6 +41,7 @@ def tools_options(command):
 
 models = {}
 
+
 def function(option_help):
     def decorator(model):
         global models, options, tools
@@ -49,7 +50,7 @@ def function(option_help):
         options.append(
             option(option_name, is_flag=True, default=False, help=option_help)
         )
-        parameters = model.model_json_schema()
+        parameters = without_title(model.model_json_schema())
         description = parameters.pop('description')
         tools[model.__name__] = dict(
             type='function',
@@ -75,4 +76,10 @@ async def tool_call(show_dialog, client, tool_call):
     return {
         'tool_call_id': tool_call.id,
         'output': json.dumps(await call(tool_call.function))
+    }
+
+
+def without_title(schema):
+    return { k: (without_title(v) if isinstance(v, dict) else v)
+        for k, v in schema.items() if not (k == 'title' and isinstance(v, str))
     }
