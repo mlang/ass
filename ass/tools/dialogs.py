@@ -6,7 +6,9 @@ import ass.ptutils as ptdialogs
 from ass.tools import function
 
 class ConfirmDialog(BaseModel):
-    """A message dialog which asks the user to either confirm or deny.  Return type is a boolean value.  Use this for "Yes/No" questions."""
+    """A message dialog which asks the user to either confirm or deny.
+    Return type is a boolean value.  Use this for "Yes/No" questions.
+    """
     type: Literal['ConfirmDialog']
     title: str = Field(description="The title of the dialog box.")
     text: str = Field(
@@ -20,7 +22,10 @@ class ConfirmDialog(BaseModel):
     )
 
 class TextInputDialog(BaseModel):
-    """A dialog which allows the user to enter a string.  Return type is either a string or null, which indicates the user cancelled the dialog."""
+    """A dialog which allows the user to enter a string.
+    Return type is either a string or null, which indicates the user cancelled
+    the dialog.
+    """
     type: Literal['TextInputDialog']
     title: str
     text: str
@@ -29,7 +34,10 @@ class TextInputDialog(BaseModel):
 
 
 class RadioListDialog(BaseModel):
-    """A single select list dialog.  Use this when querying the user for a single choice from a list of items.  Return the selected item, or null when the user cancelled the dialog."""
+    """A single select list dialog.  Use this when querying the user for a
+    single choice from a list of items.
+    Return the selected item, or null when the user cancelled the dialog.
+    """
     type: Literal['RadioListDialog']
     title: str = Field(description="The title of the dialog box.")
     text: str = Field(description="Text displayed above of the radio button list.")
@@ -43,7 +51,11 @@ class RadioListDialog(BaseModel):
 
 
 class CheckboxListDialog(BaseModel):
-    """A multiselect list dialog.  Use this when querying the user for several selections.  Return type is a list of all selected items, or null when the user cancelled the dialog."""
+    """A multiselect list dialog.
+    Use this when querying the user for several selections.
+    Return type is a list of all selected items,
+    or null when the user cancelled the dialog.
+    """
     type: Literal['CheckboxListDialog']
     title: str = Field(description="The title of the dialog box.")
     text: str = Field(description="Text displayed above of the checkbox list.")
@@ -58,11 +70,15 @@ class CheckboxListDialog(BaseModel):
 
 @function(
     "Execute a sequence of dialogs.  Choose amongst the available dialog box types approriately.",
-    "Allow prompting."
+    "Allow the model to pup up dialog boxes."
 )
 class dialogs(BaseModel):
-    questions: List[ConfirmDialog | RadioListDialog | CheckboxListDialog | TextInputDialog] = Field(
-        description="List of modal dialogs to pop up in sequence.  Returns a list of results.",
+    questions: List[ ConfirmDialog
+                   | RadioListDialog
+                   | CheckboxListDialog
+                   | TextInputDialog
+                   ] = Field(
+        description="List of modal dialogs to pop up in sequence.  Returns a list of the results.",
         min_length=1, max_length=99,
         discriminator='type'
     )

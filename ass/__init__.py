@@ -17,6 +17,7 @@ import ass.tools.orf
 import ass.tools.owm
 import ass.tools.shell
 import ass.tools.tts
+import ass.tools.wikipedia
 load_tools()
 
 from ass import tui
