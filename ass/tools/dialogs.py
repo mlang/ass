@@ -70,7 +70,7 @@ class CheckboxListDialog(BaseModel):
 
 @function(
     "Execute a sequence of dialogs.  Choose amongst the available dialog box types approriately.",
-    "Allow the model to pup up dialog boxes."
+    "Allow the model to pop up dialog boxes."
 )
 class dialogs(BaseModel):
     questions: List[ ConfirmDialog
