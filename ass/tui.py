@@ -23,8 +23,8 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, new_files, Usage
-from ass.ptutils import show_dialog, ConfirmDialog, CheckboxListDialog, TextInputDialog
+from ass.oai import new_assistant, new_thread, new_files, AUsage
+from ass.ptutils import show_dialog
 from ass.tools import tools_options, tools, tool_call
 
 @command(help="Interactively chat with an assistant")
@@ -44,17 +44,17 @@ def chat(client, *, files, **spec):
                 del spec[name]
         return result
     spec['tools'] = fix_spec()
-    run(tui(client, spec, files))
+    run(async_ui(client, spec, files, tui))
 
 
-async def tui(client, spec, files):
+async def async_ui(client, spec, files, ui):
     async with new_files(client.openai, files) as files:
         spec.update({'file_ids': [file.id for file in files]})
         async with new_assistant(client.openai, **spec) as assistant:
             async with new_thread(client.openai) as thread:
-                await app(client, thread, assistant)
+                await ui(client, thread, assistant)
 
-async def app(client, thread, assistant):
+async def tui(client, thread, assistant):
     state = State()
     search_field = SearchToolbar()
 
@@ -186,5 +186,5 @@ def add_text(text_area: TextArea, text: str) -> None:
 
 @dataclass
 class State:
-    usage: Usage = field(default_factory=Usage)
+    usage: AUsage = field(default_factory=AUsage)
     run: Optional[AsyncRuns] = None

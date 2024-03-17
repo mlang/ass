@@ -78,8 +78,9 @@ class CheckboxListDialog(BaseModel):
 @function("Allow the model to pop up dialog boxes.")
 class dialogs(BaseModel):
     """Execute a sequence of modal dialogs.
-    Choose amongst the available dialog box types approriately.
-    Use this to inquire information from the user or when asked to execute/generate quizzes.
+    Use this to inquire information from the user.
+    Always use it when asked to generate a quiz.
+    Make sure to customize the button labels according to the conversation language.
     """
 
     questions: List[ ConfirmDialog
@@ -97,14 +98,17 @@ class dialogs(BaseModel):
             examples=[
                 dict(
                     questions=[
-                        dict(type='ConfirmDialog', title="Ready?",
+                        dict(type='ConfirmDialog',
+                             title="Ready?",
                              text="Are you ready to begin?",
-                             yes_label="Sure", no_label="No thanks"
+                             yes_label="Sure", no_label="No, thanks"
                         ),
-                        dict(type='TextInputDialog', title="Your name",
+                        dict(type='TextInputDialog',
+                             title="Your name",
                              text="Please enter your name."
                         ),
-                        dict(type='RadioListDialog', title="Gender",
+                        dict(type='RadioListDialog',
+                             title="Gender",
                              text="Please select your biological gender.",
                              values=["Female", "Male"]
                         ),

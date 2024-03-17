@@ -2,16 +2,18 @@
 
 import re
 from asyncio import gather, run
+
 from bs4 import BeautifulSoup
-from markdownify import markdownify # type: ignore
 import httpx
+from markdownify import markdownify # type: ignore
+from pydantic import BaseModel
 
 from ass.tools import function
-from pydantic import BaseModel
+
 
 @function("Enable fetching news from ORF.")
 class orf_news(BaseModel):
-    """Fetch local news from ORF."""
+    """Fetch current local news from ORF."""
 
     async def __call__(self, show_dialog, client):
         return await news(client.http)
@@ -24,10 +26,8 @@ def decompose_all(element, patterns):
         kwargs = {}
         if attrs is not None:
             kwargs['attrs'] = attrs
-        e = element.find(name, **kwargs)
-        while e is not None:
+        while e := element.find(name, **kwargs):
             e.decompose()
-            e = element.find(name, **kwargs)
 
 async def news(http):
     response = await http.get('https://news.orf.at/')
@@ -56,6 +56,7 @@ async def news(http):
         }
 
     return await gather(*(map(story, soup.find_all('article'))))
+
 
 async def weather(station):
     async with httpx.AsyncClient() as http:

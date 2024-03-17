@@ -20,8 +20,7 @@ import ass.tools.tts
 import ass.tools.wikipedia
 load_tools()
 
-from ass import tui
-from ass import vision
+from ass import simple, tui, vision
 
 @group()
 @option("--openai-api-key")
@@ -30,6 +29,7 @@ from ass import vision
 def cli(ctx, **kwargs):
     ctx.obj = clients(**kwargs)
 
+cli.add_command(simple.ask)
 cli.add_command(tui.chat)
 cli.add_command(vision.describe_image)
 
