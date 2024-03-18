@@ -56,12 +56,7 @@ async def stream_a_run(
     ],
     events: AsyncStream[AssistantStreamEvent]
 ):
-    async def flatten(events: AsyncStream[AssistantStreamEvent]):
-        async for event in events:
-            async for output in process(event):
-                yield output
-
-    async def process(event: AssistantStreamEvent):
+    while event := await anext(events, None):
         match event:
             case ThreadMessageDelta(
                 data=MessageDeltaEvent(delta=MessageDelta(content=list(blocks)))
@@ -74,7 +69,9 @@ async def stream_a_run(
             case ThreadRunStepDelta(
                 data=RunStepDeltaEvent(
                     delta=RunStepDelta(
-                        step_details=ToolCallDeltaObject(tool_calls=list(tool_calls))
+                        step_details=ToolCallDeltaObject(
+                            tool_calls=list(tool_calls)
+                        )
                     )
                 )
             ):
@@ -119,15 +116,11 @@ async def stream_a_run(
                 ) as run
             ):
                 yield StatusChanged(status=run.status)
-                async for output in flatten(
-                    await openai.beta.threads.runs.submit_tool_outputs(
-                        stream=True, thread_id=run.thread_id, run_id=run.id,
-                        tool_outputs=await gather(*map(call_tool, tool_calls))
-                    )
-                ):
-                    yield output
-
-    return flatten(events)
+                await events.close()
+                events = await openai.beta.threads.runs.submit_tool_outputs(
+                    stream=True, thread_id=run.thread_id, run_id=run.id,
+                    tool_outputs=await gather(*map(call_tool, tool_calls))
+                )
 
 
 class MsgText(BaseModel):

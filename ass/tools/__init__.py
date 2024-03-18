@@ -25,18 +25,27 @@ tools = dict(
 )
 
 options = [
-    option("--code-interpreter", is_flag=True, default=False,
-           help="Offer a code_interpreter to the assistant."),
-    option("--retrieval", is_flag=True, default=False,
-           help="Use retrieval to index provided files.")
+    ( "code_interpreter"
+    , option("--code-interpreter", is_flag=True, default=False,
+             help="Offer a code_interpreter to the assistant.")
+    ),
+    ( "retrieval"
+    , option("--retrieval", is_flag=True, default=False,
+             help="Use retrieval to index provided files.")
+    )
+  
 ]
 
 
-def tools_options(command):
-    for flag in reversed(options):
-        command = flag(command)
+def tools_options(exclude=[]):
+    def decorator(command):
+        for name, flag in reversed(options):
+            if name not in exclude:
+                command = flag(command)
 
-    return command
+        return command
+
+    return decorator
 
 
 models = {}
@@ -48,7 +57,10 @@ def function(option_help):
         models[model.__name__] = model
         option_name = f"--{model.__name__.replace('_', '-')}"
         options.append(
-            option(option_name, is_flag=True, default=False, help=option_help)
+            (
+                model.__name__,
+                option(option_name, is_flag=True, default=False, help=option_help)
+            )
         )
         parameters = without_title(model.model_json_schema())
         description = parameters.pop('description')

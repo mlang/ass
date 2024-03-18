@@ -1,5 +1,4 @@
 from asyncio import run
-from asyncio.subprocess import PIPE
 import sys
 
 from click import argument, group, option, pass_context, pass_obj, File

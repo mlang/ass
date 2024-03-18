@@ -12,7 +12,7 @@ from ass.tools import tools_options, tools, tool_call
 @option("--model", default="gpt-4-0125-preview", show_default=True)
 @option("--message-file", type=File('r'), default='-', show_default=True,
         help="File to read the question from.")
-@tools_options
+@tools_options(exclude=('dialogs', 'shell'))
 @argument("files", nargs=-1, type=File('rb'))
 @pass_obj
 def ask(client, *, files, message_file, **spec):
@@ -37,10 +37,10 @@ async def async_ui(client, spec, files, ui):
                 await ui(client, thread, assistant)
 
 async def cli(text, client, thread, assistant):
-    message = await client.openai.beta.threads.messages.create(
+    await client.openai.beta.threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
-    async for output in await stream_a_run(client.openai,
+    async for output in stream_a_run(client.openai,
         partial(tool_call, None, client),
         await client.openai.beta.threads.runs.create(
             stream=True, thread_id=thread.id, assistant_id=assistant.id

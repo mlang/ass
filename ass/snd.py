@@ -1,5 +1,4 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import PIPE
 from glob import glob
 from os.path import basename, splitext
 from pathlib import Path

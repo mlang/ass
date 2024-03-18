@@ -1,25 +1,24 @@
-from asyncio import create_task, gather, run, sleep
+from asyncio import create_task, run
 from dataclasses import dataclass, field
 from functools import partial
 import re
 from typing import Optional
 from click import command, option, argument, pass_obj, File
 from openai import AsyncOpenAI
-from openai.resources.beta.threads.runs import AsyncRuns
 from prompt_toolkit.application import Application
 from prompt_toolkit.application.current import get_app
-from prompt_toolkit.completion import PathCompleter, WordCompleter
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.focus import focus_next
 from prompt_toolkit.layout.containers import (
-    Float, FloatContainer, FormattedTextControl, HSplit, VSplit, Window, WindowAlign
+    FloatContainer, FormattedTextControl, HSplit, VSplit, Window, WindowAlign
 )
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import (
-    Button, Dialog, FormattedTextToolbar, SearchToolbar, TextArea
+    SearchToolbar, TextArea
 )
 from pygments.lexers.markup import MarkdownLexer
 
@@ -30,7 +29,7 @@ from ass.tools import tools_options, tools, tool_call
 @command(help="Interactively chat with an assistant")
 @option("--instructions", show_default=True, default="You are a helpful assistant.")
 @option("--model", default="gpt-4-0125-preview", show_default=True)
-@tools_options
+@tools_options()
 @argument("files", nargs=-1, type=File('rb'))
 @pass_obj
 def chat(client, *, files, **spec):
@@ -141,11 +140,11 @@ async def tui(client, thread, assistant):
 
 
 async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, call_tool):
-    message = await openai.beta.threads.messages.create(
+    await openai.beta.threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
     display(f"\n{text}\n")
-    async for output in await stream_a_run(openai, call_tool,
+    async for output in stream_a_run(openai, call_tool,
         await openai.beta.threads.runs.create(
             stream=True, thread_id=thread.id, assistant_id=assistant.id
         )
