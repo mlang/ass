@@ -23,7 +23,7 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, new_files, AUsage
+from ass.oai import new_assistant, new_thread, new_files, AUsage, MsgText, StatusChanged, UsageReport, stream_a_run
 from ass.ptutils import show_dialog
 from ass.tools import tools_options, tools, tool_call
 
@@ -81,7 +81,7 @@ async def tui(client, thread, assistant):
     def status_text():
         return [
             ('', '---'),
-            ('class:run', f"[{state.run.status if state.run else ''}]"),
+            ('class:run', f"[{state.status if state.status else ''}]"),
             ('', '---')
         ]
     def status_text_right():
@@ -113,8 +113,7 @@ async def tui(client, thread, assistant):
     )
     def accept(buffer):
         if buffer.text:
-            def display(text):
-                add_text(output_field, f"\n{text}")
+            display = partial(add_text, output_field)
             create_task(
                 txrx(client.openai, thread, buffer.text, assistant, display, state, exec_tool_call)
             )
@@ -141,40 +140,24 @@ async def tui(client, thread, assistant):
     ).run_async()
 
 
-async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, exec_tool_call):
+async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, call_tool):
     message = await openai.beta.threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
-    display(text)
-    state.run = await openai.beta.threads.runs.create(
-        thread_id=thread.id, assistant_id=assistant.id
-    )
-    get_app().invalidate()
-    while state.run.status in ('queued', 'in_progress'):
-        await sleep(1)
-        state.run = await openai.beta.threads.runs.retrieve(
-            run_id=state.run.id, thread_id=thread.id
+    display(f"\n{text}\n")
+    async for output in await stream_a_run(openai, call_tool,
+        await openai.beta.threads.runs.create(
+            stream=True, thread_id=thread.id, assistant_id=assistant.id
         )
-        get_app().invalidate()
-        if state.run.status == 'requires_action' and state.run.required_action is not None:
-            state.run = await openai.beta.threads.runs.submit_tool_outputs(
-                thread_id=thread.id, run_id=state.run.id,
-                tool_outputs=await gather(*map(
-                    exec_tool_call,
-                    state.run.required_action.submit_tool_outputs.tool_calls
-                ))
-            )
-            get_app().invalidate()
-
-    state.usage += state.run.usage
-    
-    messages = await openai.beta.threads.messages.list(
-        thread_id=thread.id, before=message.id
-    )
-    for msg in reversed(messages.data):
-        display("".join(
-            part.text.value for part in msg.content if part.type == 'text'
-        ))
+    ):
+        match output:
+            case MsgText(token=token):
+                display(token)
+            case StatusChanged(status=status):
+                state.status = status
+                get_app().invalidate()
+            case UsageReport(usage=usage):
+                state.usage += usage
 
 
 def add_text(text_area: TextArea, text: str) -> None:
@@ -187,4 +170,4 @@ def add_text(text_area: TextArea, text: str) -> None:
 @dataclass
 class State:
     usage: AUsage = field(default_factory=AUsage)
-    run: Optional[AsyncRuns] = None
+    status: Optional[str] = None
