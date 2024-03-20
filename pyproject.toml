@@ -6,7 +6,7 @@ authors = ["Mario Lang <mlang@blind.guru>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-openai = "^1.14.1"
+openai = "^1.14.2"
 prompt-toolkit = "^3.0.43"
 beautifulsoup4 = "^4.12.3"
 markdownify = "^0.11.6"

@@ -5,8 +5,10 @@ import re
 from typing import Optional
 from click import command, option, argument, pass_obj, File
 from openai import AsyncOpenAI
+from openai.types.beta.threads import Run
 from prompt_toolkit.application import Application
 from prompt_toolkit.application.current import get_app
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
@@ -22,7 +24,7 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, new_files, AUsage, MsgText, StatusChanged, UsageReport, stream_a_run
+from ass.oai import new_assistant, new_thread, new_files, create_and_handle_required_actions, AUsage
 from ass.ptutils import show_dialog
 from ass.tools import tools_options, tools, tool_call
 
@@ -49,8 +51,8 @@ def chat(client, *, files, **spec):
 async def async_ui(client, spec, files, ui):
     async with new_files(client.openai, files) as files:
         spec.update({'file_ids': [file.id for file in files]})
-        async with new_assistant(client.openai, **spec) as assistant:
-            async with new_thread(client.openai) as thread:
+        async with new_assistant(client.openai.beta.assistants, **spec) as assistant:
+            async with new_thread(client.openai.beta.threads) as thread:
                 await ui(client, thread, assistant)
 
 async def tui(client, thread, assistant):
@@ -61,6 +63,7 @@ async def tui(client, thread, assistant):
         style="class:output-field",
         text="",
         read_only=True,
+        wrap_lines=True,
         lexer=PygmentsLexer(MarkdownLexer)
     )
 
@@ -71,6 +74,7 @@ async def tui(client, thread, assistant):
         height=1,
         prompt="> ",
         completer=WordCompleter(words),
+        auto_suggest=AutoSuggestFromHistory(),
         style="class:input-field",
         multiline=False,
         wrap_lines=True,
@@ -140,23 +144,22 @@ async def tui(client, thread, assistant):
 
 
 async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, call_tool):
-    await openai.beta.threads.messages.create(
+    threads = openai.beta.threads
+    await threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
     display(f"\n{text}\n")
-    async for output in stream_a_run(openai, call_tool,
-        await openai.beta.threads.runs.create(
-            stream=True, thread_id=thread.id, assistant_id=assistant.id
-        )
+    async for event in create_and_handle_required_actions(
+        threads.runs, call_tool, thread_id=thread.id, assistant_id=assistant.id
     ):
-        match output:
-            case MsgText(token=token):
+        match event:
+            case str(token):
                 display(token)
-            case StatusChanged(status=status):
+            case Run(status=status, usage=usage):
                 state.status = status
+                if status in ('completed', 'failed', 'cancelled', 'expired'):
+                    state.usage += usage
                 get_app().invalidate()
-            case UsageReport(usage=usage):
-                state.usage += usage
 
 
 def add_text(text_area: TextArea, text: str) -> None:
