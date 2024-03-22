@@ -77,18 +77,12 @@ def function(option_help):
     return decorator
 
 
-async def tool_call(show_dialog, client, tool_call):
-    async def call(func):
-        try:
-            function = models[func.name](**json.loads(func.arguments))
-            return await function(show_dialog, client)
-        except Exception as e:
-            return repr(e)
-
-    return {
-        'tool_call_id': tool_call.id,
-        'output': json.dumps(await call(tool_call.function))
-    }
+async def tool_call(show_dialog, client, function):
+    try:
+        model = models[function.name](**json.loads(function.arguments))
+        return await model(show_dialog, client)
+    except Exception as e:
+        return repr(e)
 
 
 def without_title(schema):

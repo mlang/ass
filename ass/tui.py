@@ -24,7 +24,7 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, new_files, create_and_handle_required_actions, AUsage
+from ass.oai import new_assistant, new_thread, new_files, stream_a_run, AUsage
 from ass.ptutils import show_dialog
 from ass.tools import tools_options, tools, tool_call
 
@@ -149,8 +149,8 @@ async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, cal
         thread_id=thread.id, role='user', content=text
     )
     display(f"\n{text}\n")
-    async for event in create_and_handle_required_actions(
-        threads.runs, call_tool, thread_id=thread.id, assistant_id=assistant.id
+    async for event in stream_a_run(threads.runs, call_tool,
+        thread_id=thread.id, assistant_id=assistant.id
     ):
         match event:
             case str(token):
