@@ -1,11 +1,13 @@
-from asyncio import create_subprocess_exec
+from asyncio import Semaphore, create_subprocess_exec
 from glob import glob
 from os.path import basename, splitext
 from pathlib import Path
 
 from asynctempfile import TemporaryDirectory, NamedTemporaryFile # type: ignore
 
-async def play(items):
+_only_one = Semaphore(1)
+
+async def play(items: list[bytes | Path]):
     async with TemporaryDirectory() as dir:
         files=[]
         for item in items:
@@ -17,7 +19,8 @@ async def play(items):
             elif isinstance(item, Path):
                 files.append(str(item.resolve()))
 
-        await cat(files, "-f", "alsa", "default")
+        async with _only_one:
+            await cat(files, "-f", "alsa", "default")
 
 
 async def cat(files, *output_args):

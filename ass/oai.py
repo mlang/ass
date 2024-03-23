@@ -1,10 +1,13 @@
-from asyncio import gather
+from asyncio import Semaphore, gather
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import json
+from hashlib import sha3_512
+from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 from openai import AsyncOpenAI
+from openai.resources.audio.speech import AsyncSpeech
 from openai.resources.beta.assistants import AsyncAssistants
 from openai.resources.beta.threads import AsyncThreads
 from openai.resources.beta.threads.runs import AsyncRuns
@@ -21,6 +24,7 @@ from openai.types.beta.threads.run import (
 from openai.types.beta.threads.required_action_function_tool_call import (
     Function
 )
+
 
 async def stream_a_run(
     runs: AsyncRuns, call: Callable[[Function], Coroutine[None, None, Any]],
@@ -99,6 +103,29 @@ async def new_files(openai: AsyncOpenAI, files):
         await gather(
             *(openai.files.delete(file.id) for file in uploaded)
         )
+
+
+async def text_to_speech(speech: AsyncSpeech,
+    text, model="tts-1-hd", voice="nova", speed=1.0, response_format="mp3",
+    cache_dir=f"~/.cache/ass/openai/audio/speech",
+    semaphore=Semaphore(1)
+) -> Path:
+    text = text.strip()
+    hash = sha3_512(text.encode('utf-8')).hexdigest()
+    dir, basename = hash[:3], hash[3:]
+    path = (
+        Path(cache_dir).expanduser() / model / voice / str(speed) /
+        dir / f"{basename}.{response_format}"
+    )
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        async with semaphore:
+            async with speech.with_streaming_response.create(
+                input=text, model=model, voice=voice, speed=speed, response_format=response_format
+            ) as response:
+                await response.stream_to_file(path)
+
+    return path
 
 
 @dataclass(slots=True)

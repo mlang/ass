@@ -14,9 +14,10 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.focus import focus_next
 from prompt_toolkit.layout.containers import (
-    FloatContainer, FormattedTextControl, HSplit, VSplit, Window, WindowAlign
+    Float, FloatContainer, FormattedTextControl, HSplit, VSplit, Window, WindowAlign
 )
 from prompt_toolkit.layout.layout import Layout
+from prompt_toolkit.layout.menus import CompletionsMenu
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import (
@@ -107,7 +108,13 @@ async def tui(client, thread, assistant):
             input_field,
             search_field
         ]),
-        floats=[]
+        floats=[
+            Float(
+                xcursor=True,
+                ycursor=True,
+                content=CompletionsMenu(max_height=16, scroll_offset=1),
+            )
+        ]
     )
 
     exec_tool_call = partial(tool_call,

@@ -1,6 +1,7 @@
 from asyncio import Future, Semaphore
 from typing import Any, Generator, Generic, TypeVar
 from prompt_toolkit.application.current import get_app
+from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.widgets import (
     Button, CheckboxList, Dialog, Label, RadioList, TextArea
@@ -34,8 +35,8 @@ class ConfirmDialog(ModalDialog):
 
 
 class TextInputDialog(ModalDialog):
-    def __init__(self, title="", text="", completer=None,
-                 ok_label="OK", cancel_label="Cancel"
+    def __init__(self,
+        title="", text="", ok_label="OK", cancel_label="Cancel", completer=None
     ):
         def accept_text(buffer):
             get_app().layout.focus(buttons[0])
@@ -43,6 +44,7 @@ class TextInputDialog(ModalDialog):
             return True
         self.textarea = TextArea(
             multiline=False,
+            completer=completer,
             accept_handler=accept_text
         )
         buttons = [
@@ -53,6 +55,15 @@ class TextInputDialog(ModalDialog):
             title=title,
             body=HSplit([Label(text=text), self.textarea]),
             buttons=buttons
+        )
+
+class PathInputDialog(TextInputDialog):
+    def __init__(self,
+        title="", text="", only_directories=False, ok_label="OK", cancel_label="Cancel"
+    ):
+        super().__init__(title=title, text=text,
+            ok_label=ok_label, cancel_label=cancel_label,
+            completer=PathCompleter(only_directories=only_directories)
         )
 
 
@@ -72,6 +83,7 @@ class RadioListDialog(ModalDialog):
             body=HSplit([Label(text=text), self.radiolist]),
             buttons=buttons
         )
+
 
 class CheckboxListDialog(ModalDialog):
     def __init__(self, title="", text="", values=[],

@@ -39,6 +39,24 @@ class TextInputDialog(BaseModel):
     cancel_label: str = "Cancel"
 
 
+class PathInputDialog(BaseModel):
+    """A dialog which asks the user to enter a filename.
+    Returns either a string or null, which indicates the user cancelled
+    the dialog.
+    """
+
+    type: Literal['PathInputDialog']
+    title: str = Field(max_length=64)
+    text: str = Field(
+        description="A message displayed above the text entry field."
+    )
+    only_directories: bool = Field(False,
+        description="If True, filename completion will only offer directories."
+    )
+    ok_label: str = "OK"
+    cancel_label: str = "Cancel"
+
+
 class RadioListDialog(BaseModel):
     """A radio button list dialog.
     Returns the selected item, or null when the user cancelled the dialog.
@@ -87,6 +105,7 @@ class dialogs(BaseModel):
                    | RadioListDialog
                    | CheckboxListDialog
                    | TextInputDialog
+                   | PathInputDialog
                    ] = Field(
         description="List of modal dialogs to pop up in sequence.  Returns a list of the results. Make sure to set the discriminator 'type' of each dialog correctly.",
         min_length=1, max_length=99,
@@ -107,6 +126,10 @@ class dialogs(BaseModel):
                              title="Your name",
                              text="Please enter your name."
                         ),
+                        dict(type='PathInputDialog',
+                             title="Enter a filename",
+                             text="Please enter a filename."
+                        ),
                         dict(type='RadioListDialog',
                              title="Gender",
                              text="Please select your biological gender.",
@@ -124,9 +147,11 @@ class dialogs(BaseModel):
     )
 
     async def __call__(self, show_dialog, client):
-        results = []
-        for question in self.questions:
+        def model(question):
             args = question.model_dump()
             dialog = getattr(ptdialogs, args.pop('type'))
-            results.append(await show_dialog(dialog(**args)))
-        return results
+            return dialog(**args)
+
+        return list(
+            await show_dialog(dialog) for dialog in map(model, self.questions)
+        )
