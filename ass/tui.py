@@ -27,6 +27,7 @@ from pygments.lexers.markup import MarkdownLexer
 
 from ass.oai import new_assistant, new_thread, new_files, stream_a_run, AUsage
 from ass.ptutils import show_dialog
+from ass.snd import start_recording
 from ass.tools import tools_options, tools, tool_call
 
 @command(help="Interactively chat with an assistant")
@@ -121,19 +122,34 @@ async def tui(client, thread, assistant):
         partial(show_dialog, container),
         client
     )
+    display = partial(add_text, output_field)
     def accept(buffer):
         if buffer.text:
-            display = partial(add_text, output_field)
             create_task(
                 txrx(client.openai, thread, buffer.text, assistant, display, state, exec_tool_call)
             )
 
     input_field.accept_handler = accept
 
+    speech_to_text = None
+    def trigger_record(event):
+        async def coroutine():
+            nonlocal speech_to_text
+            if speech_to_text:
+                text = await speech_to_text(client.openai.audio.transcriptions)
+                speech_to_text = None
+                await txrx(client.openai, thread, text, assistant, display, state, exec_tool_call)
+            else:
+                speech_to_text = await start_recording()
+
+        create_task(coroutine())
+
+
     kb = KeyBindings()
 
     kb.add("c-x", "o")(focus_next)
     kb.add("c-x", "c-c")(lambda event: event.app.exit())
+    kb.add("c-x", "c-r")(trigger_record)
 
     style = Style([
         ("output-field", "bg:#000000 #ffffff"),
