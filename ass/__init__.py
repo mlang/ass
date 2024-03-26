@@ -23,6 +23,7 @@ from ass import simple, tui, vision
 
 @group()
 @option("--openai-api-key")
+@option("--openai-base-url")
 @option("--openweathermap-api-key")
 @pass_context
 def cli(ctx, **kwargs):
@@ -54,10 +55,11 @@ async def atts(openai: AsyncOpenAI, model, voice, speed, format, input):
 
 
 class clients:
-    def __init__(self, *, openai_api_key, openweathermap_api_key):
+    def __init__(self, *, openai_api_key, openai_base_url, openweathermap_api_key):
         self.http = httpx.AsyncClient()
         self.openai = AsyncOpenAI(
-            api_key=openai_api_key, http_client=self.http
+            api_key=openai_api_key, base_url=openai_base_url,
+            http_client=self.http
         )
         self.geocoder = Nominatim(
             user_agent=__package__,

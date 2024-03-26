@@ -131,16 +131,19 @@ async def tui(client, thread, assistant):
 
     input_field.accept_handler = accept
 
-    speech_to_text = None
+    stop_recording = None
     def trigger_record(event):
         async def coroutine():
-            nonlocal speech_to_text
-            if speech_to_text:
-                text = await speech_to_text(client.openai.audio.transcriptions)
-                speech_to_text = None
-                await txrx(client.openai, thread, text, assistant, display, state, exec_tool_call)
+            nonlocal stop_recording
+            if stop_recording:
+                async with stop_recording() as mp3:
+                    stop_recording = None
+                    text = await client.openai.audio.transcriptions.create(
+                        file=mp3, model='whisper-1', response_format='text'
+                    )
+                    await txrx(client.openai, thread, text.strip(), assistant, display, state, exec_tool_call)
             else:
-                speech_to_text = await start_recording()
+                stop_recording = await start_recording()
 
         create_task(coroutine())
 

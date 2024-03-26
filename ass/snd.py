@@ -45,21 +45,19 @@ async def start_recording(
     cache_dir = expanduser(cache_dir)
     if not exists(cache_dir):
         mkdir(cache_dir)
-    file = join(cache_dir, f'{uuid4()}.mp3')
+    filename = join(cache_dir, f'{uuid4()}.mp3')
     args = ['-loglevel', 'quiet']
     args.extend(source)
-    args.extend(['-ac', '1', '-b:a', '128k', '-y', file])
+    args.extend(['-ac', '1', '-b:a', '128k', '-y', filename])
     ffmpeg = await create_subprocess_exec('ffmpeg', *args)
 
-    async def transcribe(transcriptions, model='whisper-1'):
+    @asynccontextmanager
+    async def stop_recording():
         ffmpeg.terminate()
-        with open(file, 'rb') as mp3:
-            text = await transcriptions.create(
-                file=mp3, model=model, response_format='text'
-            )
-            return text.strip()
+        with open(filename, 'rb') as file:
+            yield file
 
-    return transcribe
+    return stop_recording
 
 
 icons = {
