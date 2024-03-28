@@ -1,4 +1,7 @@
+"""Simple Ffmpeg-based sound I/O layer."""
+
 from asyncio import Semaphore, create_subprocess_exec
+from asyncio.subprocess import DEVNULL
 from contextlib import asynccontextmanager
 from glob import glob
 from os import mkdir
@@ -49,7 +52,7 @@ async def start_recording(
     args = ['-loglevel', 'quiet']
     args.extend(source)
     args.extend(['-ac', '1', '-b:a', '128k', '-y', filename])
-    ffmpeg = await create_subprocess_exec('ffmpeg', *args)
+    ffmpeg = await create_subprocess_exec('ffmpeg', *args, stdin=DEVNULL)
 
     @asynccontextmanager
     async def stop_recording():
