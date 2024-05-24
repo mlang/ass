@@ -1,10 +1,9 @@
 from pydantic import Field
 
-from ass.tools import tool, Function
+from ass.tools import Function
 
 
-@tool("Give the model access to OpenWeatherMap.")
-class weather(Function):
+class weather(Function, help="Give the model access to OpenWeatherMap."):
     """Retrieve current weather for a particular location."""
 
     location: str = Field(

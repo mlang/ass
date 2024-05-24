@@ -5,10 +5,9 @@ from aiosmtplib import SMTP
 
 from pydantic import NameEmail, Field
 
-from ass.tools import tool, Function
+from ass.tools import Function
 
-@tool("Allow the model to send e-Mail via SMTP.")
-class sendmail(Function):
+class sendmail(Function, help="Allow the model to send e-Mail via SMTP."):
     """Send an e-Mail."""
     sender: str = 'mlang+assistant@blind.guru'
     to: List[NameEmail] = Field(min_length=1)

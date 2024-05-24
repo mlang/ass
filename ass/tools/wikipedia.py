@@ -1,11 +1,10 @@
 from typing import Literal
 from xml.etree import ElementTree
 
-from ass.tools import tool, Function
+from ass.tools import Function
 
 
-@tool("Allow access to wikipedia.")
-class wikipedia(Function):
+class wikipedia(Function, help="Allow access to wikipedia."):
     """Fetch a wikipedia article by page name."""
 
     lang: Literal['de', 'en', 'es', 'fr', 'it', 'nl', 'no', 'pt', 'ro'] = 'en'

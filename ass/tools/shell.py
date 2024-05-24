@@ -2,11 +2,10 @@ from asyncio import create_subprocess_shell
 from asyncio.subprocess import PIPE
 
 from ass.ptutils import ConfirmDialog
-from ass.tools import tool, Function
+from ass.tools import Function
 
 
-@tool("Give the model (supervised) access to the local Shell.")
-class shell(Function):
+class shell(Function, help="Give the model (supervised) access to the local Shell."):
     """Execute a shell command (bash)."""
 
     command: str

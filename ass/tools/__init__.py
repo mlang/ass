@@ -55,6 +55,23 @@ class Function(BaseModel):
         ...
 
     @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__()
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, /, help):
+        global _options, tools
+        tool_call.models[cls.__name__] = cls
+        option_name = f"--{cls.__name__.replace('_', '-')}"
+        _options.append(
+            (
+                cls.__name__,
+                option(option_name, is_flag=True, default=False, help=help)
+            )
+        )
+        tools[cls.__name__] = cls.function_tool_param()
+
+    @classmethod
     def function_tool_param(cls) -> FunctionToolParam:
         def filter_title(schema: dict) -> dict:
             return { k: (filter_title(v) if isinstance(v, dict) else v)
@@ -72,24 +89,6 @@ class Function(BaseModel):
                 'parameters': schema
             }
         }
-
-
-def tool(option_help):
-    def decorator(model):
-        global _options, tools
-        tool_call.models[model.__name__] = model
-        option_name = f"--{model.__name__.replace('_', '-')}"
-        _options.append(
-            (
-                model.__name__,
-                option(option_name, is_flag=True, default=False, help=option_help)
-            )
-        )
-        tools[model.__name__] = model.function_tool_param()
-
-        return model
-
-    return decorator
 
 
 class tool_call:

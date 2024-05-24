@@ -7,7 +7,7 @@ from typing import Generic, Iterable, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from ass.tools import tool, Function
+from ass.tools import Function
 
 
 Name = TypeVar('Name')
@@ -57,8 +57,7 @@ TmuxCommand = ( capture_pane
               )
 
 
-@tool("Allow access to tmux.")
-class tmux(Function):
+class tmux(Function, help="Allow access to tmux."):
     """Call a tmux subcommand."""
     command: TmuxCommand
 

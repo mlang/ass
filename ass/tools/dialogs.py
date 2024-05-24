@@ -3,7 +3,7 @@ from typing import List, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 import ass.ptutils as ptdialogs
-from ass.tools import tool, Function
+from ass.tools import Function
 
 class DialogModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -96,8 +96,7 @@ class CheckboxListDialog(DialogModel):
     cancel_label: str = Field("Cancel", min_length=1, max_length=20)
 
 
-@tool("Allow the model to pop up dialog boxes.")
-class dialogs(Function):
+class dialogs(Function, help="Allow the model to pop up dialog boxes."):
     """Execute a sequence of modal dialogs.
     Use this to inquire information from the user.
     Always use it when asked to generate a quiz.

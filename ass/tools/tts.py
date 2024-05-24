@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from ass.oai import text_to_speech
 from ass.snd import play, icons
-from ass.tools import tool, Function
+from ass.tools import Function
 
 
 class Text(BaseModel):
@@ -19,8 +19,7 @@ IconName = Literal[*sorted(icons.keys())] # type: ignore
 class SoundIcon(BaseModel):
     sound: IconName # type: ignore
 
-@tool("Let the model use Text-To-Speech and SoundIcons.")
-class tts(Function):
+class tts(Function, help="Let the model use Text-To-Speech and SoundIcons."):
     """Render synthetic speech and/or sound icons.
     Use it when answering the user with plain text.
     Use SoundIcons if appropriate, for instance, to indicate list items or
