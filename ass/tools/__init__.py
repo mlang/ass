@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from importlib.util import spec_from_file_location, module_from_spec
 from os import path, walk
-from typing import Dict
+from typing import Dict, Type
 
 
 from click import option
@@ -61,7 +61,7 @@ class Function(BaseModel):
     @classmethod
     def __pydantic_init_subclass__(cls, /, help):
         global _options, tools
-        tool_call.models[cls.__name__] = cls
+        tool_call.add(cls)
         option_name = f"--{cls.__name__.replace('_', '-')}"
         _options.append(
             (
@@ -92,14 +92,19 @@ class Function(BaseModel):
 
 
 class tool_call:
-    models: Dict[str, Function] = {}
+    models: Dict[str, Type[Function]] = {}
+
+    @classmethod
+    def add(cls, model: Type[Function]):
+        cls.models[model.__name__] = model
+
+    @classmethod
+    def validate(cls, name: str, arguments: str):
+        return cls.models[name].model_validate_json(arguments)
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     async def __call__(self, function):
-        model = self.models[function.name].model_validate_json(
-            function.arguments
-        )
-        return await model(self)
+        return await self.validate(function.name, function.arguments)(self)

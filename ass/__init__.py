@@ -6,6 +6,7 @@ from click import argument, group, option, pass_context, pass_obj, File
 from geopy.geocoders import Nominatim # type: ignore
 import httpx
 from openai import AsyncOpenAI
+from playwright.async_api import async_playwright
 
 from ass.geopy import httpx_adapter
 from ass.owm import AsyncOpenWeatherMap
@@ -15,6 +16,7 @@ from ass.tools import load_tools
 import ass.tools.dialogs
 import ass.tools.orf
 import ass.tools.owm
+import ass.tools.playwright
 import ass.tools.shell
 import ass.tools.smtp
 import ass.tools.tmux
@@ -71,3 +73,4 @@ class clients:
         self.owm = AsyncOpenWeatherMap(
             api_key=openweathermap_api_key, http_client=self.http
         )
+        self.playwright = async_playwright()
