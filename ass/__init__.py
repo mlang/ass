@@ -13,10 +13,10 @@ from ass.owm import AsyncOpenWeatherMap
 from ass.snd import play
 
 from ass.tools import load_tools
+import ass.tools.browser
 import ass.tools.dialogs
 import ass.tools.orf
 import ass.tools.owm
-import ass.tools.playwright
 import ass.tools.shell
 import ass.tools.smtp
 import ass.tools.tmux
@@ -73,4 +73,11 @@ class clients:
         self.owm = AsyncOpenWeatherMap(
             api_key=openweathermap_api_key, http_client=self.http
         )
-        self.playwright = async_playwright()
+        self._playwright = async_playwright()
+
+    async def __aenter__(self):
+        self.playwright = await self._playwright.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return await self._playwright.__aexit__(exc_type, exc_value, traceback)

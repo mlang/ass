@@ -41,10 +41,11 @@ def chat(client, *, files, **spec):
 
 
 async def async_ui(client, spec, files, ui):
-    async with assistant_params(client.openai, files, **spec) as params:
-        async with new_assistant(client.openai.beta.assistants, **params) as assistant:
-            async with new_thread(client.openai.beta.threads) as thread:
-                await ui(client, thread, assistant)
+    async with client as client:
+        async with assistant_params(client.openai, files, **spec) as params:
+            async with new_assistant(client.openai.beta.assistants, **params) as assistant:
+                async with new_thread(client.openai.beta.threads) as thread:
+                    await ui(client, thread, assistant)
 
 async def tui(client, thread, assistant):
     state = State()
