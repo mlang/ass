@@ -9,7 +9,7 @@ from ass.tools import Function
 
 
 class PageAction(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
+    model_config = ConfigDict(frozen=True)
 
     @abstractmethod
     async def __call__(self, page):
@@ -63,17 +63,16 @@ Selector = Annotated[str,
     Field(
         description="A playwright selector.",
         examples=[
-            '''role=button[name="Submit")]'''
-            '''role=link[name="more information")]'''
+            '''role=button[name="Submit"]''',
+            '''role=link[name="more information"]'''
         ]
     )
 ]
 
 
 class count(PageAction):
-    """Count the number of page elements which match a selector.
-    Using this will not result in a timeout if the selector does not match
-    anything on the page.  Useful for validating selector before using them.
+    """Count the number of page elements matched by a selector.
+    Useful for validating a selector before using it to invoke an element.
     """
     type: Literal['count']
     selector: Selector
