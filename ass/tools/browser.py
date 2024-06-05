@@ -33,15 +33,53 @@ class go_back(PageAction):
         await getattr(page, self.type)()
 
 
+class accessibility(PageAction):
+    """Returns a snapshot of the Accessibility Tree."""
+    type: Literal['accessibility']
+
+    async def __call__(self, page):
+        return await getattr(page, self.type).snapshot()
+
+def get_selectors(node: dict, selectors=[]):
+    if 'role' in node and 'name' in node:
+        role = node['role']
+        name = node['name']
+        if name and name not in ('heading', 'text leaf'):
+            selectors.append(f'role={role}[name="{name}"]')
+    if 'children' in node:
+        for child in node['children']:
+            get_selectors(child, selectors)
+
+    return selectors
+
+class list_selectors(PageAction):
+    """Return a list of possible selectors for interaction with page elements."""
+    type: Literal['list_selectors']
+
+    async def __call__(self, page):
+        return get_selectors(await page.accessibility.snapshot())
+
 Selector = Annotated[str,
     Field(
         description="A playwright selector.",
         examples=[
-            '''text="Link name"''',
             '''role=button[name="Submit")]'''
+            '''role=link[name="more information")]'''
         ]
     )
 ]
+
+
+class count(PageAction):
+    """Count the number of page elements which match a selector.
+    Using this will not result in a timeout if the selector does not match
+    anything on the page.  Useful for validating selector before using them.
+    """
+    type: Literal['count']
+    selector: Selector
+
+    async def __call__(self, page):
+        return await getattr(page.locator(self.selector), self.type)()
 
 
 class click(PageAction):
@@ -95,7 +133,9 @@ class fill(PageAction):
         await getattr(page.locator(self.selector), self.type)(self.value)
 
 
-class Screenshot(PageAction):
+class screenshot(PageAction):
+    type: Literal['screenshot']
+
     full_page: bool = False
     caret: Optional[Literal['hide', 'initial']] = None
     mask: Optional[List[Selector]] = None
@@ -107,7 +147,7 @@ class Screenshot(PageAction):
     n: Annotated[int, Field(ge=1, le=5)] = 1
 
     async def __call__(self, page):
-        png = await page.screenshot(
+        png = await getattr(page, self.type)(
             type='png',
             full_page=self.full_page,
             caret=self.caret,
@@ -131,27 +171,32 @@ class Screenshot(PageAction):
 
 
 Action = Annotated[
-    Union[goto | go_back | click | check | hover | uncheck | fill],
+    Union[ goto | go_back
+         | accessibility | screenshot | list_selectors
+         | count | click | check | hover | uncheck | fill
+         ],
     Field(discriminator='type')
 ]
 
 
 class browser(Function, help="Allow access to a headless graphical browser."):
     """Interact with a browser.
-    After the (optional) action was performed, a screenshot is taken
-    which will be described by a vision model.
+    If the action does not return a result (like goto and go_back),
+    a snapshot of the accessibility tree is returned.
+    For further details, request a screenshot which is going to be
+    described by a vision model according to your instructions.
     """
 
     browser: Literal['chromium', 'firefox', 'webkit'] = "firefox"
-    action: Optional[Action] = None
-    screenshot: Screenshot = Screenshot()
+    action: Action
 
     async def __call__(self, env):
         page = await get_page(env.client.playwright, self.browser)
-        if self.action:
-            await self.action(page)
-        describe = await self.screenshot(page)
-        return await describe(env.client.openai.chat.completions)
+        if result := await self.action(page):
+            if callable(result):
+                result = await result(env.client.openai.chat.completions)
+            return result
+        return await page.accessibility.snapshot()
 
 
 _browser = {}
