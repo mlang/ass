@@ -3,17 +3,16 @@ from asyncio.subprocess import PIPE
 
 from pydantic import HttpUrl
 
-from ass.tools import Function
+from ass.tools import function
 
 
-class ocr(Function, help="Allow the model to fetch images and run local OCR on them."):
+@function(help="Allow the model to fetch images and run local OCR on them.")
+async def ocr(env, /, *, url: HttpUrl):
     """Downloads an image and performs OCR on it, returning a string."""
-    url: HttpUrl
 
-    async def __call__(self, env):
-        response = await env.client.http.get(str(self.url))
-        response.raise_for_status()
-        return await tesseract(response.content)
+    response = await env.client.http.get(str(url))
+    response.raise_for_status()
+    return await tesseract(response.content)
 
 
 async def tesseract(source: bytes) -> str:

@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from ass.tools import Function
+from ass.tools import function
 
 
 class PageAction(BaseModel):
@@ -178,7 +178,11 @@ Action = Annotated[
 ]
 
 
-class browser(Function, help="Allow access to a headless graphical browser."):
+@function(help="Allow access to a headless graphical browser.")
+async def browser(env, /, *,
+    browser: Literal['chromium', 'firefox', 'webkit'] = "firefox",
+    action: Action
+):
     """Interact with a browser.
     If the action does not return a result (like goto and go_back),
     a snapshot of the accessibility tree is returned.
@@ -186,16 +190,12 @@ class browser(Function, help="Allow access to a headless graphical browser."):
     described by a vision model according to your instructions.
     """
 
-    browser: Literal['chromium', 'firefox', 'webkit'] = "firefox"
-    action: Action
-
-    async def __call__(self, env):
-        page = await get_page(env.client.playwright, self.browser)
-        if result := await self.action(page):
-            if callable(result):
-                result = await result(env.client.openai.chat.completions)
-            return result
-        return await page.accessibility.snapshot()
+    page = await get_page(env.client.playwright, browser)
+    if result := await action(page):
+        if callable(result):
+            result = await result(env.client.openai.chat.completions)
+        return result
+    return await page.accessibility.snapshot()
 
 
 _browser = {}

@@ -7,7 +7,7 @@ from typing import Generic, Iterable, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from ass.tools import Function
+from ass.tools import function
 
 
 Name = TypeVar('Name')
@@ -57,18 +57,16 @@ TmuxCommand = ( capture_pane
               )
 
 
-class tmux(Function, help="Allow access to tmux."):
+@function(help="Allow access to tmux.")
+async def tmux(env, /, *, command: TmuxCommand):
     """Call a tmux subcommand."""
-    command: TmuxCommand
 
-    async def __call__(self, env):
-        tmux = await create_subprocess_exec('tmux',
-            self.command.name, *self.command.args(),
-            stdout=PIPE, stderr=PIPE
-        )
-        output, error = await tmux.communicate()
-        return {
-            'returncode': tmux.returncode,
-            **({'output': output.decode()} if output else {}),
-            **({'error': error.decode()} if error else {})
-        }
+    tmux = await create_subprocess_exec('tmux', command.name, *command.args(),
+        stdout=PIPE, stderr=PIPE
+    )
+    output, error = await tmux.communicate()
+    return {
+        'returncode': tmux.returncode,
+        **({'output': output.decode()} if output else {}),
+        **({'error': error.decode()} if error else {})
+    }

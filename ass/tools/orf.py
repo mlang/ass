@@ -7,14 +7,14 @@ from bs4 import BeautifulSoup
 import httpx
 from markdownify import markdownify # type: ignore
 
-from ass.tools import Function
+from ass.tools import function
 
 
-class orf_news(Function, help="Enable fetching news from ORF."):
+@function(help="Enable fetching news from ORF.")
+async def orf_news(env):
     """Fetch current local news from ORF."""
 
-    async def __call__(self, env):
-        return await news(env.client.http)
+    return await news(env.client.http)
 
 
 __all__ = ['news']

@@ -1,11 +1,12 @@
 from asyncio import gather, Semaphore
 from typing import List, Literal
+from typing_extensions import Annotated
 
 from pydantic import BaseModel, Field
 
 from ass.oai import text_to_speech
 from ass.snd import play, icons
-from ass.tools import Function
+from ass.tools import function
 
 
 class Text(BaseModel):
@@ -19,7 +20,10 @@ IconName = Literal[*sorted(icons.keys())] # type: ignore
 class SoundIcon(BaseModel):
     sound: IconName # type: ignore
 
-class tts(Function, help="Let the model use Text-To-Speech and SoundIcons."):
+@function(help="Let the model use Text-To-Speech and SoundIcons.")
+async def tts(env, /, *,
+    clips: Annotated[List[Text | SoundIcon], Field(min_length=1)]
+):
     """Render synthetic speech and/or sound icons.
     Use it when answering the user with plain text.
     Use SoundIcons if appropriate, for instance, to indicate list items or
@@ -29,20 +33,17 @@ class tts(Function, help="Let the model use Text-To-Speech and SoundIcons."):
     partition at the paragraph boundary.
     """
 
-    clips: List[Text | SoundIcon] = Field(min_length=1)
+    limit = Semaphore(7)
+    async def get_path(segment):
+        if isinstance(segment, Text):
+            return await text_to_speech(env.client.openai.audio.speech,
+                text=segment.text, model="tts-1", voice=segment.voice,
+                speed=segment.speed, response_format="mp3",
+                semaphore=limit
+            )
+        else:
+            return icons[segment.sound]
 
-    async def __call__(self, env):
-        limit = Semaphore(7)
-        async def get_path(segment):
-            if isinstance(segment, Text):
-                return await text_to_speech(env.client.openai.audio.speech,
-                    text=segment.text, model="tts-1", voice=segment.voice,
-                    speed=segment.speed, response_format="mp3",
-                    semaphore=limit
-                )
-            else:
-                return icons[segment.sound]
+    await play(await gather(*map(get_path, clips)))
 
-        await play(await gather(*map(get_path, self.clips)))
-
-        return f"Played {len(self.clips)} audio segments"
+    return f"Played {len(clips)} audio segments"

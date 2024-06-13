@@ -1,22 +1,21 @@
+from typing_extensions import Annotated
+
 from pydantic import Field
 
-from ass.tools import Function
+from ass.tools import function
 
 
-class weather(Function, help="Give the model access to OpenWeatherMap."):
+Location = Annotated[str,
+    Field(
+        description="""Will be looked up using a geocoder.""",
+        example='Steyergasse, Graz, Austria'
+    )
+]
+
+@function(help="Give the model access to OpenWeatherMap.")
+async def weather(env, /, *, location: Location):
     """Retrieve current weather for a particular location."""
 
-    location: str = Field(
-        description="""Will be looked up using a geocoder."""
+    return await env.client.owm.weather(
+        await env.client.geocoder.geocode(location)
     )
-
-    model_config = dict(
-        json_schema_extra=dict(
-            examples=[dict(location='Steyergasse, Graz, Austria')]
-        )
-    )
-
-    async def __call__(self, env):
-        return await env.client.owm.weather(
-            await env.client.geocoder.geocode(self.location)
-        )

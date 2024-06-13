@@ -1,9 +1,10 @@
 from typing import List, Literal
+from typing_extensions import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
 import ass.ptutils as ptdialogs
-from ass.tools import Function
+from ass.tools import function
 
 class DialogModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -96,65 +97,60 @@ class CheckboxListDialog(DialogModel):
     cancel_label: str = Field("Cancel", min_length=1, max_length=20)
 
 
-class dialogs(Function, help="Allow the model to pop up dialog boxes."):
+Questions = Annotated[
+    List[ ConfirmDialog
+        | RadioListDialog
+        | CheckboxListDialog
+        | TextInputDialog
+        | PathInputDialog
+        ],
+    Field(
+        description="""List of modal dialogs to pop up in sequence. """
+                    """Returns a list of the results.""",
+        min_length=1, max_length=99,
+        discriminator='type',
+        example=[
+            dict(type='ConfirmDialog',
+                 title="Ready?",
+                 text="Are you ready to begin?",
+                 yes_label="Sure", no_label="No, thanks"
+            ),
+            dict(type='TextInputDialog',
+                 title="Your name",
+                 text="Please enter your name."
+            ),
+            dict(type='PathInputDialog',
+                 title="Enter a filename",
+                 text="Please enter a filename."
+            ),
+            dict(type='RadioListDialog',
+                 title="Gender",
+                 text="Please select your biological gender.",
+                 values=["Female", "Male"]
+            ),
+            dict(type='CheckboxListDialog',
+                title="Favourite colours",
+                text="What colours do you like?",
+                values=["Blue", "Green", "Red", "Yellow"]
+            )
+        ]
+    )
+]
+
+@function(help="Allow the model to pop up dialog boxes.")
+async def dialogs(env, /, *, questions: Questions):
     """Execute a sequence of modal dialogs.
     Use this to inquire information from the user.
     Always use it when asked to generate a quiz.
     Make sure to customize the button labels according to the conversation language.
     """
 
-    questions: List[ ConfirmDialog
-                   | RadioListDialog
-                   | CheckboxListDialog
-                   | TextInputDialog
-                   | PathInputDialog
-                   ] = Field(
-        description="List of modal dialogs to pop up in sequence.  Returns a list of the results. Make sure to set the discriminator 'type' of each dialog correctly.",
-        min_length=1, max_length=99,
-        discriminator='type'
-    )
+    def model(question):
+        args = question.model_dump()
+        dialog = getattr(ptdialogs, args.pop('type'))
+        return dialog(**args)
 
-    model_config = ConfigDict(
-        json_schema_extra=dict(
-            examples=[
-                dict(
-                    questions=[
-                        dict(type='ConfirmDialog',
-                             title="Ready?",
-                             text="Are you ready to begin?",
-                             yes_label="Sure", no_label="No, thanks"
-                        ),
-                        dict(type='TextInputDialog',
-                             title="Your name",
-                             text="Please enter your name."
-                        ),
-                        dict(type='PathInputDialog',
-                             title="Enter a filename",
-                             text="Please enter a filename."
-                        ),
-                        dict(type='RadioListDialog',
-                             title="Gender",
-                             text="Please select your biological gender.",
-                             values=["Female", "Male"]
-                        ),
-                        dict(type='CheckboxListDialog',
-                            title="Favourite colours",
-                            text="What colours do you like?",
-                            values=["Blue", "Green", "Red", "Yellow"]
-                        )
-                    ]
-                )
-            ]
-        )
-    )
-
-    async def __call__(self, env):
-        def model(question):
-            args = question.model_dump()
-            dialog = getattr(ptdialogs, args.pop('type'))
-            return dialog(**args)
-
-        return [
-            await env.show_dialog(dialog)
-            for dialog in map(model, self.questions)
-        ]
+    return [
+        await env.show_dialog(dialog)
+        for dialog in map(model, questions)
+    ]

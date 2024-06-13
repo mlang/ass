@@ -165,12 +165,14 @@ async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, cal
         thread_id=thread.id, role='user', content=text
     )
     display(f"\n{text}\n")
+    first = True
     async for event in stream_a_run(threads.runs, call_tool,
         thread_id=thread.id, assistant_id=assistant.id
     ):
         match event:
             case str(token):
-                display(token)
+                display(token, sync=first)
+                first = False
             case Run(status=status, usage=usage):
                 state.status = status
                 if status in ('completed', 'failed', 'cancelled', 'expired'):
@@ -178,12 +180,13 @@ async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, cal
                 get_app().invalidate()
 
 
-def add_text(text_area: TextArea, text: str) -> None:
+def add_text(text_area: TextArea, text: str, sync=False) -> None:
     text_area.document = Document(
         text=text_area.text + text,
-        cursor_position=len(text_area.text) + 1
-        #cursor_position=text_area.document.cursor_position
+        cursor_position=len(text_area.text) if sync else text_area.document.cursor_position
     )
+    if sync:
+        get_app().layout.focus(text_area)
 
 
 @dataclass
