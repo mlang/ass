@@ -25,10 +25,9 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, assistant_params, stream_a_run, AUsage
+from ass.oai import new_assistant, new_thread, assistant_params, stream_a_run, AUsage, tools_options, tool_call
 from ass.ptutils import show_dialog
 from ass.snd import start_recording
-from ass.tools import tools_options, tool_call
 
 @command(help="Interactively chat with an assistant")
 @option("--instructions", show_default=True, default="You are a helpful assistant.")

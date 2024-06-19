@@ -4,7 +4,7 @@ from typing_extensions import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 import ass.ptutils as ptdialogs
-from ass.tools import function
+from ass.oai import function
 
 class DialogModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)

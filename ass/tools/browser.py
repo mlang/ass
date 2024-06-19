@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from ass.tools import function
+from ass.oai import function
 
 
 class PageAction(BaseModel):

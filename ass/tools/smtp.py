@@ -5,7 +5,7 @@ from aiosmtplib import SMTP
 
 from pydantic import NameEmail, Field
 
-from ass.tools import function
+from ass.oai import function
 
 @function(help="Allow the model to send e-Mail via SMTP.")
 async def sendmail(env, /, *,

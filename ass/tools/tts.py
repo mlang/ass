@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ass.oai import text_to_speech
 from ass.snd import play, icons
-from ass.tools import function
+from ass.oai import function
 
 
 class Text(BaseModel):

@@ -7,7 +7,7 @@ from typing import Generic, Iterable, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from ass.tools import function
+from ass.oai import function
 
 
 Name = TypeVar('Name')

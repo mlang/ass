@@ -1,19 +1,26 @@
+from abc import abstractmethod
 from asyncio import Semaphore, gather, sleep
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
 from hashlib import sha3_512
+import inspect
 import json
 from pathlib import Path
 from traceback import format_exc
 from typing import Any, AsyncIterator, Callable, Coroutine
+from typing_extensions import Annotated
 
+import click
 from openai import AsyncOpenAI
 from openai.resources.audio.speech import AsyncSpeech
 from openai.resources.beta.assistants import AsyncAssistants
 from openai.resources.beta.threads import AsyncThreads
 from openai.resources.beta.threads.runs import AsyncRuns
 from openai.resources.beta.vector_stores import AsyncVectorStores
-from openai.types.beta import FileSearchToolParam
+from openai.types.beta import (
+    AssistantToolParam, CodeInterpreterToolParam, FileSearchToolParam,
+    FunctionToolParam
+)
 from openai.types.beta.assistant_stream_event import MessageDeltaEvent
 from openai.types.beta.assistant_create_params import (
     AssistantCreateParams, ToolResources, ToolResourcesFileSearch
@@ -30,8 +37,148 @@ from openai.types.beta.threads.run import (
 from openai.types.beta.threads.required_action_function_tool_call import (
     Function
 )
-from ass.tools import tools
+import pydantic
 
+
+from importlib.util import spec_from_file_location, module_from_spec
+from os import path, walk
+from typing import Any, Callable, ClassVar, Dict, List, Tuple, Type, TypeVar
+
+
+def function(**kwargs):
+    """Register an async def with keyword arguments as a function tool."""
+
+    def decorator(func):
+        _callable_model(func, FunctionTool, **kwargs)
+
+        return func
+
+    return decorator
+
+
+class FunctionTool(pydantic.BaseModel):
+    """A base class for defining function tools."""
+    _models: ClassVar[Dict[str, 'FunctionTool']] = {}
+    _options: ClassVar[List[Tuple[str, Callable[[Any], Any]]]] = []
+    @classmethod
+    def __pydantic_init_subclass__(cls, /, *, help, default=False):
+        FunctionTool._models[cls.__name__]=cls
+        option_name = f"--{cls.__name__.replace('_', '-')}"
+        flag=click.option(option_name, is_flag=True, default=default, help=help)
+        FunctionTool._options.append((cls.__name__, flag))
+
+    @classmethod
+    def function_tool_param(cls) -> FunctionToolParam:
+        def filter_title(schema: dict) -> dict:
+            return { k: (filter_title(v) if isinstance(v, dict) else v)
+                for k, v in schema.items()
+                if not (k == 'title' and isinstance(v, str))
+            }
+
+        schema = filter_title(cls.model_json_schema())
+
+        return {
+            'type': 'function',
+            'function': {
+                'name': cls.__name__,
+                'description': schema.pop('description'),
+                'parameters': schema
+            }
+        }
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__()
+
+    @abstractmethod
+    async def __call__(self, *args):
+        ...
+
+    model_config = pydantic.ConfigDict(frozen=True)
+
+
+def tools():
+    functiontools = {
+        name: model.function_tool_param()
+        for name, model in FunctionTool._models.items()
+    }
+    return {**internaltools, **functiontools}
+
+
+def tools_options(exclude=[]):
+    """Add enablers for all registered tools to a command."""
+
+    def decorator(command):
+        for name, flag in reversed(internaloptions + FunctionTool._options):
+            if name not in exclude:
+                command = flag(command)
+
+        return command
+
+    return decorator
+
+
+async def call(function: Function, *args):
+    """Call a function tool."""
+    model = FunctionTool._models[function.name]
+    return await model.model_validate_json(function.arguments)(*args)
+
+
+class tool_call:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    async def __call__(self, function: Function):
+        return await call(function, self)
+
+
+def load_tools():
+    for spec in (
+        spec_from_file_location('plugin', path.join(root, file))
+        for dir in (
+            "/etc/ass/plugins/", path.expanduser("~/.config/ass/plugins/")
+        )
+        for root, dirs, files in walk(dir)
+        for file in files if file.endswith('.py')
+    ):
+        spec.loader.exec_module(module_from_spec(spec))
+
+
+_Model = TypeVar('_Model', bound=pydantic.BaseModel)
+
+def _callable_model(func: Type[Callable[..., Any]],
+    base: Type[_Model], **kwargs
+) -> Type[_Model]:
+    async def __call__(self, *args):
+        return await func(*args, **self.model_dump())
+
+    impl = type(f'{func.__name__}Callable', (), {'__call__': __call__})
+
+    def _or(value, default):
+        return value if value != inspect.Parameter.empty else default
+
+    fields: Dict[str, Any] = {
+        param.name: (_or(param.annotation, Any), _or(param.default, ...))
+        for param in inspect.signature(func).parameters.values()
+        if param.kind == inspect.Parameter.KEYWORD_ONLY
+    }
+
+    return pydantic.create_model(func.__name__,
+        __doc__=func.__doc__, __base__=(impl,base), __cls_kwargs__=kwargs,
+        **fields
+    )
+
+
+internaltools: Dict[str, AssistantToolParam] = {
+    'code_interpreter': CodeInterpreterToolParam(type='code_interpreter'),
+}
+
+internaloptions = [
+    ("code_interpreter",
+     click.option("--code-interpreter", is_flag=True, default=False,
+                  help="""Offer a code_interpreter to the assistant."""))
+]
 
 async def stream_a_run(
     runs: AsyncRuns, call: Callable[[Function], Coroutine[None, None, Any]],
@@ -125,22 +272,23 @@ async def new_files(openai: AsyncOpenAI, files):
 
 @asynccontextmanager
 async def assistant_params(
-    openai: AsyncOpenAI, files, **kwargs
+    openai: AsyncOpenAI, files, /, *, instructions, model, **kwargs
 ) -> AsyncIterator[AssistantCreateParams]:
+    t = tools()
     params = AssistantCreateParams(
-        instructions=kwargs['instructions'],
-        model=kwargs['model'],
-        tools=[tools[tool]
-            for tool in tools.keys() if tool in kwargs if kwargs[tool]
-        ]
+        instructions=instructions,
+        model=model,
+        tools=[t[tool] for tool in t.keys() if tool in kwargs if kwargs[tool]]
     )
 
-    if not files:
-        yield params
-        return
-
-    async with new_files(openai, files) as remote_files:
-        async with new_vector_store(openai.beta.vector_stores) as store:
+    async with AsyncExitStack() as stack:
+        if files:
+            remote_files = await stack.enter_async_context(
+                new_files(openai, files)
+            )
+            store = await stack.enter_async_context(
+                new_vector_store(openai.beta.vector_stores)
+            )
             batch = await openai.beta.vector_stores.file_batches.create(
                 vector_store_id=store.id,
                 file_ids=[file.id for file in remote_files]
@@ -158,7 +306,7 @@ async def assistant_params(
                 )
             )
 
-            yield params
+        yield params
 
 
 async def text_to_speech(speech: AsyncSpeech, text, *,

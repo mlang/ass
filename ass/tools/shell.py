@@ -2,7 +2,7 @@ from asyncio import create_subprocess_shell
 from asyncio.subprocess import PIPE
 
 from ass.ptutils import ConfirmDialog
-from ass.tools import function
+from ass.oai import function
 
 
 @function(help="""Give the model (supervised) access to the local Shell.""")

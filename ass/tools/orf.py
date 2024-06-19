@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import httpx
 from markdownify import markdownify # type: ignore
 
-from ass.tools import function
+from ass.oai import function
 
 
 @function(help="Enable fetching news from ORF.")

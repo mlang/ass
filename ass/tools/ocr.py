@@ -3,7 +3,7 @@ from asyncio.subprocess import PIPE
 
 from pydantic import HttpUrl
 
-from ass.tools import function
+from ass.oai import function
 
 
 @function(help="Allow the model to fetch images and run local OCR on them.")

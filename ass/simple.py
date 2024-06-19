@@ -2,8 +2,10 @@ from asyncio import run
 
 from click import command, option, argument, pass_obj, File
 
-from ass.oai import new_assistant, new_thread, assistant_params, stream_a_run
-from ass.tools import tools_options, tool_call
+from ass.oai import (
+    new_assistant, new_thread, assistant_params, stream_a_run,
+    tools_options, tool_call
+)
 
 
 @command(help="Ask a single question")

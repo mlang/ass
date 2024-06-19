@@ -12,7 +12,7 @@ from ass.geopy import httpx_adapter
 from ass.owm import AsyncOpenWeatherMap
 from ass.snd import play
 
-from ass.tools import load_tools
+from ass.oai import load_tools
 import ass.tools.browser
 import ass.tools.dialogs
 import ass.tools.ocr
