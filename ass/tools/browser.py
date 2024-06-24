@@ -178,11 +178,11 @@ Action = Annotated[
 ]
 
 
+Browser = Literal['chromium', 'firefox', 'webkit']
+
+
 @function(help="Allow access to a headless graphical browser.")
-async def browser(env, /, *,
-    browser: Literal['chromium', 'firefox', 'webkit'] = "firefox",
-    action: Action
-):
+async def browser(env, /, *, browser: Browser = "firefox", action: Action):
     """Interact with a browser.
     If the action does not return a result (like goto and go_back),
     a snapshot of the accessibility tree is returned.

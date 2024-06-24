@@ -25,7 +25,7 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import new_assistant, new_thread, assistant_params, stream_a_run, AUsage, tools_options, tool_call
+from ass.oai import make_assistant, new_thread, stream_a_run, AUsage, tools_options, tool_call
 from ass.ptutils import show_dialog
 from ass.snd import start_recording
 
@@ -41,10 +41,9 @@ def chat(client, *, files, **spec):
 
 async def async_ui(client, spec, files, ui):
     async with client as client:
-        async with assistant_params(client.openai, files, **spec) as params:
-            async with new_assistant(client.openai.beta.assistants, **params) as assistant:
-                async with new_thread(client.openai.beta.threads) as thread:
-                    await ui(client, thread, assistant)
+        async with make_assistant(client.openai, files, **spec) as assistant:
+            async with new_thread(client.openai.beta.threads) as thread:
+                await ui(client, thread, assistant)
 
 async def tui(client, thread, assistant):
     state = State()

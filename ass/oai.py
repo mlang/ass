@@ -2,13 +2,15 @@ from abc import abstractmethod
 from asyncio import Semaphore, gather, sleep
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
-from hashlib import sha3_512
+import hashlib
+from importlib.util import spec_from_file_location, module_from_spec
 import inspect
 import json
+import os
 from pathlib import Path
-from traceback import format_exc
-from typing import Any, AsyncIterator, Callable, Coroutine
-from typing_extensions import Annotated
+import traceback
+from typing import (Any, AsyncIterator, Awaitable, Callable, ClassVar, Dict,
+                    List, Tuple, Type)
 
 import click
 from openai import AsyncOpenAI
@@ -23,7 +25,8 @@ from openai.types.beta import (
 )
 from openai.types.beta.assistant_stream_event import MessageDeltaEvent
 from openai.types.beta.assistant_create_params import (
-    AssistantCreateParams, ToolResources, ToolResourcesFileSearch
+    AssistantCreateParams, ToolResources, ToolResourcesCodeInterpreter,
+    ToolResourcesFileSearch
 )
 from openai.types.beta.threads import (
     MessageDelta, TextDeltaBlock, TextDelta, Run
@@ -40,16 +43,103 @@ from openai.types.beta.threads.required_action_function_tool_call import (
 import pydantic
 
 
-from importlib.util import spec_from_file_location, module_from_spec
-from os import path, walk
-from typing import Any, Callable, ClassVar, Dict, List, Tuple, Type, TypeVar
+@asynccontextmanager
+async def make_assistant(
+    openai: AsyncOpenAI, files, /, *, instructions, model, **kwargs
+) -> AsyncIterator[AssistantCreateParams]:
+    tools = {k: v for k, v in alltools().items() if k in kwargs if kwargs[k]}
+    params = AssistantCreateParams(
+        instructions=instructions,
+        model=model,
+        tools=tools.values()
+    )
+
+    async with AsyncExitStack() as stack:
+        if files:
+            tool_resources = ToolResources()
+            remote_files = await stack.enter_async_context(
+                new_files(openai, files)
+            )
+            if 'code_interpreter' in tools:
+                tool_resources['code_interpreter'] = ToolResourcesCodeInterpreter(
+                    file_ids=[file.id for file in remote_files]
+                )
+            if 'file_search' in tools:
+                store = await stack.enter_async_context(
+                    new_vector_store(openai.beta.vector_stores)
+                )
+                batch = await openai.beta.vector_stores.file_batches.create(
+                    vector_store_id=store.id,
+                    file_ids=[file.id for file in remote_files]
+                )
+                while batch.status == "in_progress":
+                    await sleep(1)
+                    batch = await openai.beta.vector_stores.file_batches.retrieve(
+                        batch.id, vector_store_id=store.id
+                    )
+
+                tool_resources['file_search'] = ToolResourcesFileSearch(
+                    vector_store_ids=[store.id]
+                )
+            params['tool_resources'] = tool_resources
+
+        assistant = await stack.enter_async_context(
+            new_assistant(openai.beta.assistants, **params)
+        )
+
+        yield assistant
+
+
+async def stream_a_run(runs: AsyncRuns,
+    call: Callable[[Function], Awaitable[Any]], **kwargs
+):
+    async def call_tool(tool_call):
+        match tool_call:
+            case RequiredActionFunctionToolCall(id=id, function=function):
+                try:
+                    result = await call(function)
+                    if isinstance(result, pydantic.BaseModel):
+                        output = result.model_dump_json()
+                    else:
+                        output = json.dumps(result)
+                except BaseException:
+                    output = traceback.format_exc()
+                return ToolOutput(tool_call_id=id, output=output)
+
+    stream = await runs.create(stream=True, **kwargs)
+    while event := await anext(stream, None):
+        yield event
+        match event.data:
+            case MessageDeltaEvent(delta=MessageDelta(content=list(blocks))):
+                for block in blocks:
+                    match block:
+                        case TextDeltaBlock(text=TextDelta(value=str(token))):
+                            yield token
+
+            case Run() as run:
+                yield run
+                match run.required_action:
+                    case RequiredAction(
+                        submit_tool_outputs=RequiredActionSubmitToolOutputs(
+                            tool_calls=tool_calls
+                        )
+                    ):
+                        await stream.close()
+                        stream = await runs.submit_tool_outputs(
+                            stream=True, thread_id=run.thread_id, run_id=run.id,
+                            tool_outputs=await gather(
+                                *map(call_tool, tool_calls)
+                            )
+                        )
+
+    await stream.close()
 
 
 def function(**kwargs):
     """Register an async def with keyword arguments as a function tool."""
 
     def decorator(func):
-        _callable_model(func, FunctionTool, **kwargs)
+        _create_function_tool(func, **kwargs)
 
         return func
 
@@ -97,7 +187,7 @@ class FunctionTool(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(frozen=True)
 
 
-def tools():
+def alltools():
     functiontools = {
         name: model.function_tool_param()
         for name, model in FunctionTool._models.items()
@@ -135,26 +225,19 @@ class tool_call:
 
 def load_tools():
     for spec in (
-        spec_from_file_location('plugin', path.join(root, file))
+        spec_from_file_location('plugin', os.path.join(root, file))
         for dir in (
-            "/etc/ass/plugins/", path.expanduser("~/.config/ass/plugins/")
+            "/etc/ass/plugins/", os.path.expanduser("~/.config/ass/plugins/")
         )
-        for root, dirs, files in walk(dir)
+        for root, dirs, files in os.walk(dir)
         for file in files if file.endswith('.py')
     ):
         spec.loader.exec_module(module_from_spec(spec))
 
 
-_Model = TypeVar('_Model', bound=pydantic.BaseModel)
-
-def _callable_model(func: Type[Callable[..., Any]],
-    base: Type[_Model], **kwargs
-) -> Type[_Model]:
-    async def __call__(self, *args):
-        return await func(*args, **self.model_dump())
-
-    impl = type(f'{func.__name__}Callable', (), {'__call__': __call__})
-
+def _create_function_tool(
+    func: Type[Callable[..., Awaitable[Any]]], **kwargs
+) -> Type[FunctionTool]:
     def _or(value, default):
         return value if value != inspect.Parameter.empty else default
 
@@ -164,63 +247,30 @@ def _callable_model(func: Type[Callable[..., Any]],
         if param.kind == inspect.Parameter.KEYWORD_ONLY
     }
 
+    async def __call__(self, *args):
+        return await func(*args, **dict(self))
+
+    impl = type(func.__name__+'Callable', (), {'__call__': __call__})
+
     return pydantic.create_model(func.__name__,
-        __doc__=func.__doc__, __base__=(impl,base), __cls_kwargs__=kwargs,
-        **fields
+        __doc__=func.__doc__, __base__=(impl,FunctionTool),
+        __cls_kwargs__=kwargs, **fields
     )
 
 
 internaltools: Dict[str, AssistantToolParam] = {
     'code_interpreter': CodeInterpreterToolParam(type='code_interpreter'),
+    'file_search': FileSearchToolParam(type='file_search')
 }
 
 internaloptions = [
     ("code_interpreter",
      click.option("--code-interpreter", is_flag=True, default=False,
-                  help="""Offer a code_interpreter to the assistant."""))
+                  help="""Offer a code_interpreter to the assistant.""")),
+    ("file_search",
+     click.option("--file-search", is_flag=True, default=False,
+                  help="""Add provided files to a vector store."""))
 ]
-
-async def stream_a_run(
-    runs: AsyncRuns, call: Callable[[Function], Coroutine[None, None, Any]],
-    **kwargs
-):
-    async def call_tool(tool_call):
-        match tool_call:
-            case RequiredActionFunctionToolCall(id=id, function=function):
-                try:
-                    output = json.dumps(await call(function))
-                except BaseException:
-                    output = format_exc()
-                return ToolOutput(tool_call_id=id, output=output)
-
-    stream = await runs.create(stream=True, **kwargs)
-    while event := await anext(stream, None):
-        yield event
-        match event.data:
-            case MessageDeltaEvent(delta=MessageDelta(content=list(blocks))):
-                for block in blocks:
-                    match block:
-                        case TextDeltaBlock(text=TextDelta(value=str(token))):
-                            yield token
-
-            case Run() as run:
-                yield run
-                match run.required_action:
-                    case RequiredAction(
-                        submit_tool_outputs=RequiredActionSubmitToolOutputs(
-                            tool_calls=tool_calls
-                        )
-                    ):
-                        await stream.close()
-                        stream = await runs.submit_tool_outputs(
-                            stream=True, thread_id=run.thread_id, run_id=run.id,
-                            tool_outputs=await gather(
-                                *map(call_tool, tool_calls)
-                            )
-                        )
-
-    await stream.close()
-
 
 @asynccontextmanager
 async def new_assistant(assistants: AsyncAssistants, **kwargs):
@@ -270,52 +320,13 @@ async def new_files(openai: AsyncOpenAI, files):
         )
 
 
-@asynccontextmanager
-async def assistant_params(
-    openai: AsyncOpenAI, files, /, *, instructions, model, **kwargs
-) -> AsyncIterator[AssistantCreateParams]:
-    t = tools()
-    params = AssistantCreateParams(
-        instructions=instructions,
-        model=model,
-        tools=[t[tool] for tool in t.keys() if tool in kwargs if kwargs[tool]]
-    )
-
-    async with AsyncExitStack() as stack:
-        if files:
-            remote_files = await stack.enter_async_context(
-                new_files(openai, files)
-            )
-            store = await stack.enter_async_context(
-                new_vector_store(openai.beta.vector_stores)
-            )
-            batch = await openai.beta.vector_stores.file_batches.create(
-                vector_store_id=store.id,
-                file_ids=[file.id for file in remote_files]
-            )
-            while batch.status == "in_progress":
-                await sleep(1)
-                batch = await openai.beta.vector_stores.file_batches.retrieve(
-                    batch.id, vector_store_id=store.id
-                )
-
-            params['tools'].append(FileSearchToolParam(type='file_search')) # type: ignore
-            params['tool_resources'] = ToolResources(
-                file_search=ToolResourcesFileSearch(
-                    vector_store_ids=[store.id]
-                )
-            )
-
-        yield params
-
-
 async def text_to_speech(speech: AsyncSpeech, text, *,
     model="tts-1-hd", voice="nova", speed=1.0, response_format="mp3",
     cache_dir="~/.cache/ass/openai/audio/speech",
     semaphore=Semaphore(1)
 ) -> Path:
     text = text.strip()
-    hash = sha3_512(text.encode('utf-8')).hexdigest()
+    hash = hashlib.sha3_512(text.encode('utf-8')).hexdigest()
     dir, basename = hash[:3], hash[3:]
     path = (
         Path(cache_dir).expanduser() / model / voice / str(speed) /

@@ -15,6 +15,7 @@ from ass.snd import play
 from ass.oai import load_tools
 import ass.tools.browser
 import ass.tools.dialogs
+import ass.tools.emacs
 import ass.tools.ocr
 import ass.tools.orf
 import ass.tools.owm

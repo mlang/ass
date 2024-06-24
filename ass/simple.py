@@ -3,8 +3,7 @@ from asyncio import run
 from click import command, option, argument, pass_obj, File
 
 from ass.oai import (
-    new_assistant, new_thread, assistant_params, stream_a_run,
-    tools_options, tool_call
+    make_assistant, new_thread, stream_a_run, tools_options, tool_call
 )
 
 
@@ -23,17 +22,16 @@ def ask(client, *, files, message_file, **spec):
 async def async_ui(client, spec, files, text):
     async with client as client:
         call = tool_call(client=client)
-        async with assistant_params(client.openai, files, **spec) as params:
-            async with new_assistant(client.openai.beta.assistants, **params) as assistant:
-                threads = client.openai.beta.threads
-                async with new_thread(threads) as thread:
-                    await threads.messages.create(thread_id=thread.id, role='user',
-                        content=text
-                    )
-                    async for event in stream_a_run(threads.runs, call,
-                        thread_id=thread.id, assistant_id=assistant.id
-                    ):
-                        match event:
-                            case str(token):
-                                print(token, end='', flush=True)
-                    print()
+        async with make_assistant(client.openai, files, **spec) as assistant:
+            threads = client.openai.beta.threads
+            async with new_thread(threads) as thread:
+                await threads.messages.create(thread_id=thread.id, role='user',
+                    content=text
+                )
+                async for event in stream_a_run(threads.runs, call,
+                    thread_id=thread.id, assistant_id=assistant.id
+                ):
+                    match event:
+                        case str(token):
+                            print(token, end='', flush=True)
+                print()
