@@ -7,13 +7,18 @@ from prompt_toolkit.widgets import (
     Button, CheckboxList, Dialog, Label, RadioList, TextArea
 )
 
+
 T = TypeVar('T')
+
+
 class ModalDialog(Dialog, Generic[T]):
     def __init__(self, **kwargs):
         self.future = Future()
         super().__init__(modal=True, **kwargs)
+
     def finish(self, value: T) -> None:
         self.future.set_result(value)
+
     def __await__(self) -> Generator[Any, None, T]:
         return self.future.__await__()
 
@@ -59,7 +64,8 @@ class TextInputDialog(ModalDialog):
 
 class PathInputDialog(TextInputDialog):
     def __init__(self,
-        title="", text="", only_directories=False, ok_label="OK", cancel_label="Cancel"
+        title="", text="", only_directories=False, ok_label="OK",
+        cancel_label="Cancel"
     ):
         super().__init__(title=title, text=text,
             ok_label=ok_label, cancel_label=cancel_label,
@@ -104,6 +110,7 @@ class CheckboxListDialog(ModalDialog):
 
 
 there_can_be_only_one = Semaphore(1)
+
 
 async def show_dialog(container: FloatContainer, dialog: ModalDialog[T]) -> T:
     floats = container.floats

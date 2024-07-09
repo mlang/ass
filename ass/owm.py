@@ -2,6 +2,7 @@
 import os
 import httpx
 
+
 class AsyncOpenWeatherMap:
     WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 

@@ -3,7 +3,7 @@ from asyncio import run
 import sys
 
 from click import argument, group, option, pass_context, pass_obj, File
-from geopy.geocoders import Nominatim # type: ignore
+from geopy.geocoders import Nominatim  # type: ignore
 import httpx
 from openai import AsyncOpenAI
 from playwright.async_api import async_playwright
@@ -24,8 +24,10 @@ import ass.tools.smtp
 import ass.tools.tmux
 import ass.tools.tts
 import ass.tools.wikipedia
+import ass.tools.z3
 from ass import simple, tui, vision, dictation
 load_tools()
+
 
 @group()
 @option("--openai-api-key")
@@ -35,10 +37,12 @@ load_tools()
 def cli(ctx, **kwargs):
     ctx.obj = clients(**kwargs)
 
+
 cli.add_command(simple.ask)
 cli.add_command(tui.chat)
 cli.add_command(vision.describe_image)
 cli.add_command(dictation.stt)
+
 
 @cli.command(help="Convert Tex to Speech")
 @option("--model", default="tts-1-hd")
@@ -50,9 +54,11 @@ cli.add_command(dictation.stt)
 def tts(client, model, voice, speed, format, input):
     run(atts(client.openai, model, voice, speed, format, input.read()))
 
+
 async def atts(openai: AsyncOpenAI, model, voice, speed, format, input):
     response = await openai.audio.speech.create(
-        input=input, model=model, voice=voice, speed=speed, response_format=format
+        input=input, model=model, voice=voice, speed=speed,
+        response_format=format
     )
     bytes = await response.aread()
     if not sys.stdout.isatty():
@@ -62,7 +68,9 @@ async def atts(openai: AsyncOpenAI, model, voice, speed, format, input):
 
 
 class clients:
-    def __init__(self, *, openai_api_key, openai_base_url, openweathermap_api_key):
+    def __init__(self, *,
+        openai_api_key, openai_base_url, openweathermap_api_key
+    ):
         self.http = httpx.AsyncClient()
         self.openai = AsyncOpenAI(
             api_key=openai_api_key, base_url=openai_base_url,

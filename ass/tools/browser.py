@@ -40,6 +40,7 @@ class accessibility(PageAction):
     async def __call__(self, page):
         return await getattr(page, self.type).snapshot()
 
+
 def get_selectors(node: dict, selectors=[]):
     if 'role' in node and 'name' in node:
         role = node['role']
@@ -52,12 +53,14 @@ def get_selectors(node: dict, selectors=[]):
 
     return selectors
 
+
 class list_selectors(PageAction):
     """Return a list of possible selectors for interaction with page elements."""
     type: Literal['list_selectors']
 
     async def __call__(self, page):
         return get_selectors(await page.accessibility.snapshot())
+
 
 Selector = Annotated[str,
     Field(
@@ -158,7 +161,8 @@ class screenshot(PageAction):
         async def describe(completions):
             response = await completions.create(
                 model=self.model,
-                max_tokens=self.max_tokens, n=self.n, temperature=self.temperature,
+                max_tokens=self.max_tokens, n=self.n,
+                temperature=self.temperature,
                 messages=[
                     {'role': 'system', 'content': self.instructions},
                     {'role': 'user', 'content': [image_url(png)]}
@@ -201,6 +205,7 @@ async def browser(env, /, *, browser: Browser = "firefox", action: Action):
 _browser = {}
 _context = {}
 _page = {}
+
 
 async def get_page(playwright, browser: str):
     global _browser, _context, _page

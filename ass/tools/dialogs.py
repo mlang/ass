@@ -9,6 +9,7 @@ from ass.oai import function
 class DialogModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+
 class ConfirmDialog(DialogModel):
     """A message dialog which asks the user to either confirm or deny.
     Return type is a boolean value.

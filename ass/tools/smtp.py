@@ -7,6 +7,7 @@ from pydantic import NameEmail, Field
 
 from ass.oai import function
 
+
 @function(help="Allow the model to send e-Mail via SMTP.")
 async def sendmail(env, /, *,
     sender: str = 'mlang+assistant@blind.guru',

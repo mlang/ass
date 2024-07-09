@@ -25,7 +25,7 @@ from prompt_toolkit.widgets import (
 )
 from pygments.lexers.markup import MarkdownLexer
 
-from ass.oai import make_assistant, new_thread, stream_a_run, AUsage, tools_options, tool_call
+from ass.oai import make_assistant, temporary_thread, stream_a_run, AUsage, tools_options, environment
 from ass.ptutils import show_dialog
 from ass.snd import start_recording
 
@@ -42,7 +42,7 @@ def chat(client, *, files, **spec):
 async def async_ui(client, spec, files, ui):
     async with client as client:
         async with make_assistant(client.openai, files, **spec) as assistant:
-            async with new_thread(client.openai.beta.threads) as thread:
+            async with temporary_thread(client.openai.beta.threads) as thread:
                 await ui(client, thread, assistant)
 
 async def tui(client, thread, assistant):
@@ -106,7 +106,7 @@ async def tui(client, thread, assistant):
         ]
     )
 
-    exec_tool_call = tool_call(
+    env = environment(
         show_dialog=partial(show_dialog, container),
         client=client
     )
@@ -114,7 +114,7 @@ async def tui(client, thread, assistant):
     def accept(buffer):
         if buffer.text:
             create_task(
-                txrx(client.openai, thread, buffer.text, assistant, display, state, exec_tool_call)
+                txrx(client.openai, thread, buffer.text, assistant, display, state, env)
             )
 
     input_field.accept_handler = accept
@@ -129,7 +129,7 @@ async def tui(client, thread, assistant):
                     text = await client.openai.audio.transcriptions.create(
                         file=mp3, model='whisper-1', response_format='text'
                     )
-                    await txrx(client.openai, thread, text.strip(), assistant, display, state, exec_tool_call)
+                    await txrx(client.openai, thread, text.strip(), assistant, display, state, env)
             else:
                 stop_recording = await start_recording()
 
@@ -157,14 +157,14 @@ async def tui(client, thread, assistant):
     ).run_async()
 
 
-async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, call_tool):
+async def txrx(openai: AsyncOpenAI, thread, text, assistant, display, state, env):
     threads = openai.beta.threads
     await threads.messages.create(
         thread_id=thread.id, role='user', content=text
     )
     display(f"\n{text}\n")
     first = True
-    async for event in stream_a_run(threads.runs, call_tool,
+    async for event in stream_a_run(threads.runs, function_tool_args=[env],
         thread_id=thread.id, assistant_id=assistant.id
     ):
         match event:

@@ -13,7 +13,12 @@ from ass.snd import start_recording
 @argument("files", nargs=-1, type=File('rb'))
 @pass_obj
 def stt(client, *, model, language, prompt, files):
-    run(astt(client.openai.audio.transcriptions, model, language, prompt, files))
+    run(
+        astt(
+            client.openai.audio.transcriptions,
+            model, language, prompt, files
+        )
+    )
 
 
 async def astt(transcriptions, model, language, prompt, files):
@@ -30,6 +35,7 @@ async def astt(transcriptions, model, language, prompt, files):
 
 async def transcribe(transcriptions, model, language, prompt, file):
     text = await transcriptions.create(
-        file=file, model=model, language=language, prompt=prompt, response_format='text'
+        file=file,
+        model=model, language=language, prompt=prompt, response_format='text'
     )
     return text.strip()

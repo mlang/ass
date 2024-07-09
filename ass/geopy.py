@@ -2,8 +2,8 @@ from asyncio import TimeoutError
 from contextlib import contextmanager
 from ssl import SSLError
 
-from geopy.exc import GeocoderServiceError, GeocoderTimedOut, GeopyError # type: ignore
-from geopy.adapters import AdapterHTTPError, BaseAsyncAdapter # type: ignore
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut, GeopyError  # type: ignore
+from geopy.adapters import AdapterHTTPError, BaseAsyncAdapter  # type: ignore
 
 
 def httpx_adapter(http_client):
@@ -18,13 +18,17 @@ def httpx_adapter(http_client):
 
         async def get_text(self, url, *, timeout, headers):
             with self._normalize_exceptions():
-                response = await http_client.get(url, timeout=timeout, headers=headers)
+                response = await http_client.get(url,
+                    timeout=timeout, headers=headers
+                )
                 self._raise_for_status(response)
                 return response.text
 
         async def get_json(self, url, *, timeout, headers):
             with self._normalize_exceptions():
-                response = await http_client.get(url, timeout=timeout, headers=headers)
+                response = await http_client.get(url,
+                    timeout=timeout, headers=headers
+                )
                 self._raise_for_status(response)
                 return response.json()
 

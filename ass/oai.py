@@ -47,7 +47,7 @@ import pydantic
 async def make_assistant(
     openai: AsyncOpenAI, files, /, *, instructions, model, **kwargs
 ) -> AsyncIterator[AssistantCreateParams]:
-    tools = {k: v for k, v in alltools().items() if k in kwargs if kwargs[k]}
+    tools = {k: v for k, v in _alltools().items() if k in kwargs if kwargs[k]}
     params = AssistantCreateParams(
         instructions=instructions,
         model=model,
@@ -58,7 +58,7 @@ async def make_assistant(
         if files:
             tool_resources = ToolResources()
             remote_files = await stack.enter_async_context(
-                new_files(openai, files)
+                temporary_files(openai, files)
             )
             if 'code_interpreter' in tools:
                 tool_resources['code_interpreter'] = ToolResourcesCodeInterpreter(
@@ -66,7 +66,7 @@ async def make_assistant(
                 )
             if 'file_search' in tools:
                 store = await stack.enter_async_context(
-                    new_vector_store(openai.beta.vector_stores)
+                    temporary_vector_store(openai.beta.vector_stores)
                 )
                 batch = await openai.beta.vector_stores.file_batches.create(
                     vector_store_id=store.id,
@@ -81,30 +81,76 @@ async def make_assistant(
                 tool_resources['file_search'] = ToolResourcesFileSearch(
                     vector_store_ids=[store.id]
                 )
+
             params['tool_resources'] = tool_resources
 
         assistant = await stack.enter_async_context(
-            new_assistant(openai.beta.assistants, **params)
+            temporary_assistant(openai.beta.assistants, **params)
         )
 
         yield assistant
 
 
-async def stream_a_run(runs: AsyncRuns,
-    call: Callable[[Function], Awaitable[Any]], **kwargs
+@asynccontextmanager
+async def temporary_assistant(assistants: AsyncAssistants, **kwargs):
+    assistant = await assistants.create(**kwargs)
+    try:
+        yield assistant
+    finally:
+        await assistants.delete(assistant.id)
+
+
+@asynccontextmanager
+async def temporary_thread(threads: AsyncThreads, **kwargs):
+    thread = await threads.create(**kwargs)
+    try:
+        yield thread
+    finally:
+        await threads.delete(thread.id)
+
+
+@asynccontextmanager
+async def temporary_vector_store(vector_stores: AsyncVectorStores, **kwargs):
+    vector_store = await vector_stores.create(**kwargs)
+    try:
+        yield vector_store
+    finally:
+        await vector_stores.delete(vector_store.id)
+
+
+@asynccontextmanager
+async def temporary_files(openai: AsyncOpenAI, files):
+    exceptions = []
+    uploaded = []
+    for item in await gather(
+        *(openai.files.create(file=file, purpose='assistants')
+          for file in files),
+        return_exceptions=True
+    ):
+        if isinstance(item, BaseException):
+            exceptions.append(item)
+        else:
+            uploaded.append(item)
+    try:
+        if exceptions:
+            raise exceptions[0]
+        yield uploaded
+    finally:
+        await gather(
+            *(openai.files.delete(file.id) for file in uploaded)
+        )
+
+
+async def stream_a_run(runs: AsyncRuns, /, *,
+    function_tool_args: List[Any] = [], **kwargs
 ):
-    async def call_tool(tool_call):
-        match tool_call:
-            case RequiredActionFunctionToolCall(id=id, function=function):
-                try:
-                    result = await call(function)
-                    if isinstance(result, pydantic.BaseModel):
-                        output = result.model_dump_json()
-                    else:
-                        output = json.dumps(result)
-                except BaseException:
-                    output = traceback.format_exc()
-                return ToolOutput(tool_call_id=id, output=output)
+    async def call_tool(
+        tool_call: RequiredActionFunctionToolCall
+    ) -> ToolOutput:
+        return {
+            'tool_call_id': tool_call.id,
+            'output': await _call(tool_call.function, *function_tool_args)
+        }
 
     stream = await runs.create(stream=True, **kwargs)
     while event := await anext(stream, None):
@@ -125,8 +171,8 @@ async def stream_a_run(runs: AsyncRuns,
                         )
                     ):
                         await stream.close()
-                        stream = await runs.submit_tool_outputs(
-                            stream=True, thread_id=run.thread_id, run_id=run.id,
+                        stream = await runs.submit_tool_outputs(stream=True,
+                            thread_id=run.thread_id, run_id=run.id,
                             tool_outputs=await gather(
                                 *map(call_tool, tool_calls)
                             )
@@ -148,19 +194,27 @@ def function(**kwargs):
 
 class FunctionTool(pydantic.BaseModel):
     """A base class for defining function tools."""
+
+    @abstractmethod
+    async def __call__(self, *args):
+        ...
+
     _models: ClassVar[Dict[str, 'FunctionTool']] = {}
     _options: ClassVar[List[Tuple[str, Callable[[Any], Any]]]] = []
+
     @classmethod
     def __pydantic_init_subclass__(cls, /, *, help, default=False):
-        FunctionTool._models[cls.__name__]=cls
-        option_name = f"--{cls.__name__.replace('_', '-')}"
-        flag=click.option(option_name, is_flag=True, default=default, help=help)
+        FunctionTool._models[cls.__name__] = cls
+        flag = click.option(f"--{cls.__name__.replace('_', '-')}",
+            is_flag=True, default=default, help=help
+        )
         FunctionTool._options.append((cls.__name__, flag))
 
     @classmethod
     def function_tool_param(cls) -> FunctionToolParam:
         def filter_title(schema: dict) -> dict:
-            return { k: (filter_title(v) if isinstance(v, dict) else v)
+            return {
+                k: (filter_title(v) if isinstance(v, dict) else v)
                 for k, v in schema.items()
                 if not (k == 'title' and isinstance(v, str))
             }
@@ -180,26 +234,38 @@ class FunctionTool(pydantic.BaseModel):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__()
 
-    @abstractmethod
-    async def __call__(self, *args):
-        ...
-
     model_config = pydantic.ConfigDict(frozen=True)
 
 
-def alltools():
-    functiontools = {
-        name: model.function_tool_param()
-        for name, model in FunctionTool._models.items()
-    }
-    return {**internaltools, **functiontools}
+async def text_to_speech(speech: AsyncSpeech, text, *,
+    model="tts-1-hd", voice="nova", speed=1.0, response_format="mp3",
+    cache_dir="~/.cache/ass/openai/audio/speech",
+    semaphore=Semaphore(1)
+) -> Path:
+    text = text.strip()
+    hash = hashlib.sha3_512(text.encode('utf-8')).hexdigest()
+    dir, basename = hash[:3], hash[3:]
+    path = (
+        Path(cache_dir).expanduser() / model / voice / str(speed) /
+        dir / f"{basename}.{response_format}"
+    )
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        async with semaphore:
+            async with speech.with_streaming_response.create(input=text,
+                model=model, voice=voice, speed=speed,
+                response_format=response_format
+            ) as response:
+                await response.stream_to_file(path)
+
+    return path
 
 
 def tools_options(exclude=[]):
     """Add enablers for all registered tools to a command."""
 
     def decorator(command):
-        for name, flag in reversed(internaloptions + FunctionTool._options):
+        for name, flag in reversed(_internaloptions + FunctionTool._options):
             if name not in exclude:
                 command = flag(command)
 
@@ -208,19 +274,10 @@ def tools_options(exclude=[]):
     return decorator
 
 
-async def call(function: Function, *args):
-    """Call a function tool."""
-    model = FunctionTool._models[function.name]
-    return await model.model_validate_json(function.arguments)(*args)
-
-
-class tool_call:
+class environment:
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
-
-    async def __call__(self, function: Function):
-        return await call(function, self)
 
 
 def load_tools():
@@ -233,6 +290,22 @@ def load_tools():
         for file in files if file.endswith('.py')
     ):
         spec.loader.exec_module(module_from_spec(spec))
+
+
+async def _call(function: Function, *args: Any) -> str:
+    """Call a function tool."""
+
+    try:
+        model = FunctionTool._models[function.name]
+        result = await model.model_validate_json(function.arguments)(*args)
+
+        if isinstance(result, pydantic.BaseModel):
+            return result.model_dump_json()
+
+        return json.dumps(result)
+
+    except BaseException:
+        return traceback.format_exc()
 
 
 def _create_function_tool(
@@ -253,17 +326,25 @@ def _create_function_tool(
     impl = type(func.__name__+'Callable', (), {'__call__': __call__})
 
     return pydantic.create_model(func.__name__,
-        __doc__=func.__doc__, __base__=(impl,FunctionTool),
+        __doc__=func.__doc__, __base__=(impl, FunctionTool),
         __cls_kwargs__=kwargs, **fields
     )
 
 
-internaltools: Dict[str, AssistantToolParam] = {
+def _alltools():
+    functiontools = {
+        name: model.function_tool_param()
+        for name, model in FunctionTool._models.items()
+    }
+    return {**_internaltools, **functiontools}
+
+
+_internaltools: Dict[str, AssistantToolParam] = {
     'code_interpreter': CodeInterpreterToolParam(type='code_interpreter'),
     'file_search': FileSearchToolParam(type='file_search')
 }
 
-internaloptions = [
+_internaloptions = [
     ("code_interpreter",
      click.option("--code-interpreter", is_flag=True, default=False,
                   help="""Offer a code_interpreter to the assistant.""")),
@@ -271,76 +352,6 @@ internaloptions = [
      click.option("--file-search", is_flag=True, default=False,
                   help="""Add provided files to a vector store."""))
 ]
-
-@asynccontextmanager
-async def new_assistant(assistants: AsyncAssistants, **kwargs):
-    assistant = await assistants.create(**kwargs)
-    try:
-        yield assistant
-    finally:
-        await assistants.delete(assistant.id)
-
-@asynccontextmanager
-async def new_thread(threads: AsyncThreads, **kwargs):
-    thread = await threads.create(**kwargs)
-    try:
-        yield thread
-    finally:
-        await threads.delete(thread.id)
-
-
-@asynccontextmanager
-async def new_vector_store(vector_stores: AsyncVectorStores, **kwargs):
-    vector_store = await vector_stores.create(**kwargs)
-    try:
-        yield vector_store
-    finally:
-        await vector_stores.delete(vector_store.id)
-
-
-@asynccontextmanager
-async def new_files(openai: AsyncOpenAI, files):
-    exceptions = []
-    uploaded = []
-    for item in await gather(
-        *(openai.files.create(file=file, purpose='assistants') for file in files),
-        return_exceptions=True
-    ):
-        if isinstance(item, BaseException):
-            exceptions.append(item)
-        else:
-            uploaded.append(item)
-    try:
-        if exceptions:
-            raise exceptions[0]
-        yield uploaded
-    finally:
-        await gather(
-            *(openai.files.delete(file.id) for file in uploaded)
-        )
-
-
-async def text_to_speech(speech: AsyncSpeech, text, *,
-    model="tts-1-hd", voice="nova", speed=1.0, response_format="mp3",
-    cache_dir="~/.cache/ass/openai/audio/speech",
-    semaphore=Semaphore(1)
-) -> Path:
-    text = text.strip()
-    hash = hashlib.sha3_512(text.encode('utf-8')).hexdigest()
-    dir, basename = hash[:3], hash[3:]
-    path = (
-        Path(cache_dir).expanduser() / model / voice / str(speed) /
-        dir / f"{basename}.{response_format}"
-    )
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        async with semaphore:
-            async with speech.with_streaming_response.create(
-                input=text, model=model, voice=voice, speed=speed, response_format=response_format
-            ) as response:
-                await response.stream_to_file(path)
-
-    return path
 
 
 @dataclass(slots=True)

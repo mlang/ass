@@ -9,14 +9,15 @@ from os.path import basename, splitext, expanduser, join, exists
 from pathlib import Path
 from uuid import uuid4
 
-from asynctempfile import TemporaryDirectory, NamedTemporaryFile # type: ignore
+from asynctempfile import TemporaryDirectory, NamedTemporaryFile  # type: ignore
 
 
 _only_one = Semaphore(1)
 
+
 async def play(items: list[bytes | Path]):
     async with TemporaryDirectory() as dir:
-        files=[]
+        files = []
         for item in items:
             if isinstance(item, bytes):
                 file = await NamedTemporaryFile(dir=dir, delete=False)
