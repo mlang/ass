@@ -44,6 +44,8 @@ cli.add_command(tui.chat)
 cli.add_command(vision.describe_image)
 cli.add_command(dictation.stt)
 cli.add_command(shell.bash)
+cli.add_command(shell.zsh)
+
 
 
 @cli.command(help="Convert Tex to Speech")

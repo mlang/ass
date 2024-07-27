@@ -3,7 +3,7 @@ name = "ass"
 version = "0.1.0"
 description = "OpenAI Assistants API Client built with prompt-toolkit"
 authors = ["Mario Lang <mlang@blind.guru>"]
-include = ["ass/bash.sh"]
+include = ["ass/bash.sh", "ass/zsh.sh"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
