@@ -16,6 +16,7 @@ def bash(**spec):
 # And bind the function to a sequence of your liking:
 #
 # bind -x '"\C-xa": ass_ask_bash'""")
+    print()
     print(f'''ASS_ASK_BASH_INSTRUCTIONS="{_instructions("Bash")}"''')
     print(f'''ASS_ASK_BASH_TOOLS="{_to_args(spec)}"''')
     print(resources.read_text(__package__, "bash.sh"))
@@ -33,13 +34,14 @@ def zsh(**spec):
 # And bind the function to a sequence of your liking:
 #
 # bindkey '^xa' ass-ask-zsh""")
+    print()
     print(f'''ASS_ASK_ZSH_INSTRUCTIONS="{_instructions("Zsh")}"''')
     print(f'''ASS_ASK_ZSH_TOOLS="{_to_args(spec)}"''')
     print(resources.read_text(__package__, "zsh.sh"))
 
 
 def _instructions(shell: str) -> str:
-  return f"""You are a {shell} command generator.
+    return f"""You are a {shell} command generator.
 Whatever you are asked, you will always provide a shell command via the result function tool.
 Everything else you say will be echoed to the users screen.
 Only return the result via the result function, never display it
