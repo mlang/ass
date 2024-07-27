@@ -14,12 +14,12 @@ from ass.snd import play
 
 from ass.oai import load_tools
 import ass.tools.browser
-import ass.tools.comment
 import ass.tools.dialogs
 import ass.tools.emacs
 import ass.tools.ocr
 import ass.tools.orf
 import ass.tools.owm
+import ass.tools.result
 import ass.tools.shell
 import ass.tools.smtp
 import ass.tools.tmux

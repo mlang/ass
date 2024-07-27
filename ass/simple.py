@@ -1,4 +1,6 @@
 from asyncio import run
+import sys
+
 
 from click import command, option, argument, pass_obj, File
 
@@ -28,6 +30,8 @@ async def async_ui(client, spec, files, text):
         async with make_assistant(client.openai, files, **spec) as assistant:
             threads = client.openai.beta.threads
             async with temporary_thread(threads) as thread:
+                file = sys.stderr if 'result' in spec else sys.stdout
+                eol = False
                 await threads.messages.create(thread_id=thread.id, role='user',
                     content=text
                 )
@@ -37,5 +41,7 @@ async def async_ui(client, spec, files, text):
                 ):
                     match event:
                         case str(token):
-                            print(token, end='', flush=True)
-                print()
+                            print(token, end='', file=file, flush=True)
+                            eol = True
+                if eol:
+                    print(file=file)

@@ -32,7 +32,7 @@ from ass.snd import start_recording
 @command(help="Interactively chat with an assistant")
 @option("--instructions", show_default=True, default="You are a helpful assistant.")
 @option("--model", default="gpt-4o-2024-05-13", show_default=True)
-@tools_options()
+@tools_options(exclude=['result'])
 @argument("files", nargs=-1, type=File('rb'))
 @pass_obj
 def chat(client, *, files, **spec):
