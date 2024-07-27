@@ -14,6 +14,7 @@ from ass.snd import play
 
 from ass.oai import load_tools
 import ass.tools.browser
+import ass.tools.comment
 import ass.tools.dialogs
 import ass.tools.emacs
 import ass.tools.ocr
@@ -25,7 +26,7 @@ import ass.tools.tmux
 import ass.tools.tts
 import ass.tools.wikipedia
 import ass.tools.z3
-from ass import simple, tui, vision, dictation
+from ass import simple, tui, vision, dictation, shell
 load_tools()
 
 
@@ -42,6 +43,7 @@ cli.add_command(simple.ask)
 cli.add_command(tui.chat)
 cli.add_command(vision.describe_image)
 cli.add_command(dictation.stt)
+cli.add_command(shell.bash)
 
 
 @cli.command(help="Convert Tex to Speech")

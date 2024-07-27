@@ -4,7 +4,7 @@ from typing_extensions import Annotated
 
 from pydantic import Field
 
-import z3
+import z3  # type: ignore
 
 from ass.oai import function
 
@@ -51,7 +51,7 @@ SMT_LIB = Annotated[str,
 @function(help="Offer Z3 to the model.")
 async def smt(env, /, *, smtlib: SMT_LIB):
     """Add SMT-LIB format assertions to a Z3 solver
-    and return the model as an s-expression.
+    and return the model as an S-expression.
 
     There is no need for (check-sat) or (get-model) since both will
     implicitly be called by this function.

@@ -3,10 +3,11 @@ name = "ass"
 version = "0.1.0"
 description = "OpenAI Assistants API Client built with prompt-toolkit"
 authors = ["Mario Lang <mlang@blind.guru>"]
+include = ["ass/bash.sh"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-openai = "^1.35.0"
+openai = "^1.37.0"
 prompt-toolkit = "^3.0.43"
 beautifulsoup4 = "^4.12.3"
 markdownify = "^0.11.6"
