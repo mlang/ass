@@ -2,7 +2,7 @@ from ass.oai import function
 
 
 @function(help="Ask the model to return results to stdout.")
-async def result(env, /, *, text: str):
+async def result(env, /, *, value: str):
     """Use this function to return a requested result, like a shell command.
 
     If you are asked to generate a specific result, like a command or a 
@@ -12,6 +12,6 @@ async def result(env, /, *, text: str):
     Your normal output will be directed to the screen.
     """
 
-    print(text)
+    print(value)
 
     return "OK, we're done"
