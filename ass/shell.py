@@ -15,7 +15,7 @@ def bash(**spec):
 #
 # And bind the function to a sequence of your liking:
 #
-# bind -x '"\C-xa": ass_ask_bash'""")
+# bind -x '"\C-xa": ass-ask-bash'""")
     print()
     print(f'''ASS_ASK_BASH_INSTRUCTIONS="{_instructions("Bash")}"''')
     print(f'''ASS_ASK_BASH_TOOLS="{_to_args(spec)}"''')

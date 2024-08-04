@@ -19,6 +19,8 @@ from openai.resources.beta.assistants import AsyncAssistants
 from openai.resources.beta.threads import AsyncThreads
 from openai.resources.beta.threads.runs import AsyncRuns
 from openai.resources.beta.vector_stores import AsyncVectorStores
+from openai.types import ChatModel
+from openai.types.audio import SpeechModel
 from openai.types.beta import (
     AssistantToolParam, CodeInterpreterToolParam, FileSearchToolParam,
     FunctionToolParam
@@ -44,8 +46,10 @@ import pydantic
 
 
 @asynccontextmanager
-async def make_assistant(
-    openai: AsyncOpenAI, files, /, *, instructions, model, **kwargs
+async def make_assistant(openai: AsyncOpenAI, files, /, *,
+    instructions: str,
+    model: ChatModel,
+    **kwargs
 ) -> AsyncIterator[AssistantCreateParams]:
     tools = {k: v for k, v in _alltools().items() if k in kwargs if kwargs[k]}
     params = AssistantCreateParams(
@@ -238,7 +242,8 @@ class FunctionTool(pydantic.BaseModel):
 
 
 async def text_to_speech(speech: AsyncSpeech, text, *,
-    model="tts-1-hd", voice="nova", speed=1.0, response_format="mp3",
+    model: SpeechModel = "tts-1-hd",
+    voice="nova", speed=1.0, response_format="mp3",
     cache_dir="~/.cache/ass/openai/audio/speech",
     semaphore=Semaphore(1)
 ) -> Path:

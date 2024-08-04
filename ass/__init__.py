@@ -48,7 +48,7 @@ cli.add_command(shell.zsh)
 
 
 
-@cli.command(help="Convert Tex to Speech")
+@cli.command(help="Convert Text to Speech")
 @option("--model", default="tts-1-hd")
 @option("--voice", default="nova")
 @option("--speed", default=1.2)
