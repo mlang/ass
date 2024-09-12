@@ -14,7 +14,7 @@ from PIL import Image
 )
 @option('--model',
         help="Which model to use for image description.",
-        default='gpt-4o-2024-05-13',
+        default='gpt-4o-2024-08-06',
         show_default=True
 )
 @option('-n',
@@ -28,7 +28,7 @@ from PIL import Image
 )
 @option('--summary-model',
         help="Model to use for summaries.",
-        default='gpt-4o-2024-05-13',
+        default='gpt-4o-2024-08-06',
         show_default=True
 )
 @option('--temperature',

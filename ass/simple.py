@@ -14,7 +14,7 @@ from ass.oai import (
     show_default=True,
     default="You are a helpful assistant."
 )
-@option("--model", default="gpt-4o-2024-05-13", show_default=True)
+@option("--model", default="gpt-4o-2024-08-06", show_default=True)
 @option("--message-file", type=File('r'), default='-', show_default=True,
         help="File to read the question from.")
 @tools_options(exclude=('dialogs', 'shell'))

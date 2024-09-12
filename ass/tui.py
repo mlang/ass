@@ -30,8 +30,8 @@ from ass.ptutils import show_dialog
 from ass.snd import start_recording
 
 @command(help="Interactively chat with an assistant")
-@option("--instructions", show_default=True, default="You are a helpful assistant.")
-@option("--model", default="gpt-4o-2024-05-13", show_default=True)
+@option("--instructions", show_default=True, default="You are a helpful assistant.  Never explain acronyms the user uses if not explicitly asked to do so.  Never apologize if the user points out one of your errors.")
+@option("--model", default="gpt-4o-2024-08-06", show_default=True)
 @tools_options(exclude=['result'])
 @argument("files", nargs=-1, type=File('rb'))
 @pass_obj
