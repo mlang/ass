@@ -98,18 +98,21 @@ class CheckboxListDialog(DialogModel):
     cancel_label: str = Field("Cancel", min_length=1, max_length=20)
 
 
+Dialog = Annotated[
+    ConfirmDialog |
+    RadioListDialog |
+    CheckboxListDialog |
+    TextInputDialog |
+    PathInputDialog,
+    Field(discriminator='type')
+]
+
 Questions = Annotated[
-    List[ ConfirmDialog
-        | RadioListDialog
-        | CheckboxListDialog
-        | TextInputDialog
-        | PathInputDialog
-        ],
+    List[ Dialog ],
     Field(
         description="""List of modal dialogs to pop up in sequence. """
                     """Returns a list of the results.""",
         min_length=1, max_length=99,
-        discriminator='type',
         example=[
             dict(type='ConfirmDialog',
                  title="Ready?",
