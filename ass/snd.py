@@ -9,7 +9,7 @@ from os.path import basename, splitext, expanduser, join, exists
 from pathlib import Path
 from uuid import uuid4
 
-from asynctempfile import TemporaryDirectory, NamedTemporaryFile  # type: ignore
+from aiofiles.tempfile import TemporaryDirectory, NamedTemporaryFile  # type: ignore
 
 
 _only_one = Semaphore(1)
